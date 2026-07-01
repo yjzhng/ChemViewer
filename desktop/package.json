@@ -1,0 +1,14 @@
+{
+  "name": "chemviewer-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "ChemViewer desktop shell (Electron) — a live from-source dev window around the Vite UI",
+  "author": "Morreale Lab <morreale.lab@gmail.com>",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "dev": "node scripts/dev.mjs"
+  },
+  "devDependencies": {
+    "electron": "^33.4.11"
+  }
+}

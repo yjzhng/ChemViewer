@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.DS_Store
+*.log
+*.tsbuildinfo
+.vite/
+public/rdkit/
+public/ocl/
+desktop/node_modules/
+desktop/build/
+.dbcache/
+library/*

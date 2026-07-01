@@ -1,0 +1,8 @@
+#!/bin/bash
+# Double-clickable launcher: no Terminal window (a .app runs its executable
+# directly). Resolves the repo it lives in, then hands off to
+# desktop/launch.sh in the background and exits, so only the Electron app window
+# remains. Update by `git pull` in the repo and relaunch — nothing to reinstall.
+DIR="$(cd "$(dirname "$0")/../../.." && pwd)" # repo root: ChemViewer.app/Contents/MacOS → ../../..
+nohup "$DIR/desktop/launch.sh" >"${TMPDIR:-/tmp}/chemviewer-launch.log" 2>&1 &
+exit 0
