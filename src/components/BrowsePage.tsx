@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useStore, type LibraryView } from '../data/store';
 import { applyFilters } from '../filters/engine';
 import { FilterBar } from './FilterBar';
@@ -47,6 +47,17 @@ export function BrowsePage() {
   const libraryLoading = useStore((s) => s.libraryLoading);
   const subsets = useStore((s) => s.subsets);
   const activeSubsetId = useStore((s) => s.activeSubsetId);
+  const manifest = useStore((s) => s.manifest);
+  const libStatus = useStore((s) => s.libStatus);
+  const selectLibraryByName = useStore((s) => s.selectLibraryByName);
+
+  // In Browse with nothing open yet, auto-open the first ready library so the
+  // user lands on data instead of the "open from Manage" prompt.
+  useEffect(() => {
+    if (libraryView !== 'browse' || library || libraryLoading) return;
+    const ready = manifest.find((m) => libStatus[m.name]?.state === 'ready');
+    if (ready) selectLibraryByName(ready.name);
+  }, [libraryView, library, libraryLoading, manifest, libStatus, selectLibraryByName]);
 
   const memberIds = useMemo(() => {
     const sub = subsets.find((s) => s.id === activeSubsetId);
@@ -95,12 +106,19 @@ export function BrowsePage() {
         <div className="empty">
           {libraryLoading ? (
             <h2>Loading library…</h2>
+          ) : manifest.length > 0 ? (
+            <>
+              <h2>Preparing libraries…</h2>
+              <p>
+                Libraries are still precomputing. See <strong>Manage</strong> for
+                progress — this view opens automatically once one is ready.
+              </p>
+            </>
           ) : (
             <>
-              <h2>No library selected</h2>
+              <h2>No libraries found</h2>
               <p>
-                Open <strong>Manage</strong> to choose a directory and see which
-                libraries are ready.
+                Open <strong>Manage</strong> to choose a directory to scan.
               </p>
             </>
           )}

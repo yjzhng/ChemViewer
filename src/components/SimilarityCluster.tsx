@@ -133,6 +133,8 @@ export function SimilarityCluster({ compounds, fetchSample, cacheKey }: Props) {
             size={280}
             highlightId={inSample ? hovered?.id : undefined}
             extra={inSample ? null : extra}
+            xLabel="UMAP 1"
+            yLabel="UMAP 2"
           />
         ) : (
           <span className="muted">{error ?? (running ? 'Computing…' : '—')}</span>

@@ -30,13 +30,12 @@ function statusLabel(s: LibStatus | undefined): string {
   if (!s) return 'Queued';
   switch (s.state) {
     case 'ready':
-      return 'Ready';
+      // Ready (map done, browsable); the 3D-shape pass may still be running.
+      return s.pmi >= 1 ? 'Ready' : `Ready · shape ${Math.round(s.pmi * 100)}%`;
     case 'loading':
       return 'Loading…';
     case 'precomputing':
-      return `Similarity ${Math.round(s.sim * 100)}% · Shape ${Math.round(
-        s.pmi * 100,
-      )}%`;
+      return `Map ${Math.round(s.sim * 100)}%`;
     case 'error':
       return 'Precompute failed';
     default:
@@ -100,9 +99,7 @@ function LibraryCard({ entry }: { entry: ManifestEntry }) {
       <div className="libcard-bar">
         <div
           className={`libcard-bar-fill${status?.state === 'error' ? ' err' : ''}`}
-          style={{
-            width: `${status?.state === 'error' ? 100 : ready ? 100 : pct}%`,
-          }}
+          style={{ width: `${status?.state === 'error' ? 100 : pct}%` }}
         />
       </div>
     </div>

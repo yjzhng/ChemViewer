@@ -4,8 +4,13 @@
  * OCL generates a 3D conformer (pure JS, the DataWarrior engine); we build the
  * mass-weighted inertia tensor, take its eigenvalues I1≤I2≤I3, and return the
  * normalized ratios NPR1 = I1/I3, NPR2 = I2/I3 — the axes of the rod–disc–sphere
- * triangle. OCL is large, so it's lazy-loaded on first use. Cached by SMILES.
+ * triangle. This module runs only inside the compute worker; OCL is imported
+ * statically so it's bundled into the worker (a runtime dynamic import fails
+ * intermittently under Vite dev — "failed to fetch dynamically imported
+ * module"). Its resource pack is registered once, on first use.
  */
+import * as OCL from 'openchemlib';
+
 export interface NPR {
   npr1: number;
   npr2: number;
@@ -20,15 +25,11 @@ const massOf = (z: number) => MASS[z] ?? 12;
 const cache = new Map<string, NPR | null>();
 const CACHE_MAX = 100_000;
 
-let oclPromise: Promise<typeof import('openchemlib')> | null = null;
+let oclPromise: Promise<typeof OCL> | null = null;
 function getOCL() {
   if (!oclPromise) {
-    oclPromise = (async () => {
-      const OCL = await import('openchemlib');
-      // ConformerGenerator needs its torsion/fragment resources registered.
-      await OCL.Resources.registerFromUrl('/ocl/resources.json');
-      return OCL;
-    })();
+    // ConformerGenerator needs its torsion/fragment resources registered once.
+    oclPromise = OCL.Resources.registerFromUrl('/ocl/resources.json').then(() => OCL);
   }
   return oclPromise;
 }

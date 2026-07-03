@@ -12,6 +12,11 @@ export interface SimWire {
   /** Indices (into the submitted SMILES) that produced a valid fingerprint. */
   keep: number[];
   vectors: number[][];
+  /** Descriptor vector per kept compound (aligned to `keep`/`vectors`). */
+  descriptors: number[][];
+  descriptorKeys: string[];
+  /** SMARTS-panel 0/1 hit vector per kept compound (present when requested). */
+  smartsHits?: number[][];
   sampled: number;
 }
 
@@ -26,12 +31,52 @@ let worker: Worker | null = null;
 let nextId = 1;
 const pending = new Map<number, Pending>();
 
+// Watchdog: OpenChemLib's 3D conformer generation can hang (infinite-loop) on
+// certain structures, which would freeze the single worker forever. We treat a
+// long silence (no progress/completion) while jobs are pending as a stall, kill
+// the worker, reject its jobs, and let the next request spin up a fresh one.
+const STALL_MS = 20000;
+let lastActivity = Date.now();
+let watchdog: ReturnType<typeof setInterval> | null = null;
+
+function startWatchdog() {
+  if (watchdog) return;
+  watchdog = setInterval(() => {
+    if (pending.size === 0) {
+      lastActivity = Date.now();
+      return;
+    }
+    if (Date.now() - lastActivity <= STALL_MS) return;
+    const w = worker;
+    worker = null;
+    if (watchdog) {
+      clearInterval(watchdog);
+      watchdog = null;
+    }
+    try {
+      w?.terminate();
+    } catch {
+      /* ignore */
+    }
+    console.error('[computeWorker] stalled — terminated and will restart');
+    const err = Object.assign(
+      new Error('compute worker stalled (a molecule likely hung 3D generation) — restarted'),
+      { stalled: true },
+    );
+    for (const p of pending.values()) p.reject(err);
+    pending.clear();
+  }, 5000);
+}
+
 function getWorker(): Worker {
   if (!worker) {
     worker = new Worker(new URL('./computeWorker.ts', import.meta.url), {
       type: 'module',
     });
+    lastActivity = Date.now();
+    startWatchdog();
     worker.onmessage = (e: MessageEvent) => {
+      lastActivity = Date.now();
       const d = e.data as {
         type: string;
         id: number;
@@ -53,7 +98,12 @@ function getWorker(): Worker {
       else p.reject(new Error(d.message || 'compute failed'));
     };
     worker.onerror = (e) => {
-      const err = new Error(e.message || 'compute worker crashed');
+      console.error('[computeWorker] error:', e.message, e.filename, e);
+      const err = new Error(
+        e.message
+          ? `compute worker: ${e.message}`
+          : 'compute worker failed to load',
+      );
       for (const p of pending.values()) p.reject(err);
       pending.clear();
     };
@@ -75,9 +125,27 @@ function send<T>(
   return { id, promise };
 }
 
-/** Similarity map (fingerprints + UMAP). Returns a job id for cancellation. */
-export function simRequest(smiles: string[], onProgress?: Progress) {
-  return send<SimWire>('sim', { smiles }, onProgress);
+/**
+ * Similarity map (fingerprints + UMAP). Returns a job id for cancellation.
+ * `withDescriptors` also computes RDKit descriptors per compound (~3× slower);
+ * `withLayout` (default true) runs the UMAP embedding — skip it when only the
+ * fingerprint vectors are needed (e.g. matrix/overlap without the map).
+ */
+export function simRequest(
+  smiles: string[],
+  onProgress?: Progress,
+  opts?: { withDescriptors?: boolean; withLayout?: boolean; smarts?: string[] },
+) {
+  return send<SimWire>(
+    'sim',
+    {
+      smiles,
+      withDescriptors: !!opts?.withDescriptors,
+      withLayout: opts?.withLayout !== false,
+      smarts: opts?.smarts,
+    },
+    onProgress,
+  );
 }
 
 /** PMI batch (3D conformers → NPR), aligned to the input SMILES. */

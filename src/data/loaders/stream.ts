@@ -52,9 +52,9 @@ function splitFields(line: string, delim: string): string[] {
  * field), or -1. Quoted fields may contain commas AND newlines (e.g. MCE CSVs
  * with multi-line description columns), so records can span physical lines.
  */
-function findRecordEnd(s: string): number {
+function findRecordEnd(s: string, start: number): number {
   let inQuotes = false;
-  for (let i = 0; i < s.length; i++) {
+  for (let i = start; i < s.length; i++) {
     const ch = s[i];
     if (ch === '"') {
       if (inQuotes && s[i + 1] === '"') i++; // escaped quote
@@ -150,10 +150,13 @@ export async function streamDelimited(
       if (done) break;
       textBuf += decoder.decode(value, { stream: true });
 
+      // Scan with a cursor and slice the consumed prefix off ONCE per chunk;
+      // slicing per record would copy the whole remaining buffer each row (O(n²)).
+      let start = 0;
       let nl: number;
-      while ((nl = findRecordEnd(textBuf)) >= 0) {
-        let line = textBuf.slice(0, nl);
-        textBuf = textBuf.slice(nl + 1);
+      while ((nl = findRecordEnd(textBuf, start)) >= 0) {
+        let line = textBuf.slice(start, nl);
+        start = nl + 1;
         if (line.endsWith('\r')) line = line.slice(0, -1);
         if (line !== '') processLine(line);
 
@@ -164,6 +167,7 @@ export async function streamDelimited(
           return { columns: outColumns, compounds, truncated };
         }
       }
+      if (start > 0) textBuf = textBuf.slice(start);
     }
     // Final partial line (no trailing newline).
     const last = textBuf.trim();

@@ -3,6 +3,7 @@ import { useStore } from '../data/store';
 import type { NPR } from '../chem/pmi';
 import { nprOne } from '../chem/computeClient';
 import { ensurePMI, Cancelled, type PmiResult } from '../chem/precompute';
+import { scaleDot } from './ScatterPlot';
 import type { Compound } from '../data/types';
 
 interface Props {
@@ -95,6 +96,7 @@ export function PMIPlot({ compounds, fetchSample, cacheKey }: Props) {
 
   const mark =
     inSample && hovered ? result?.byId.get(hovered.id) ?? null : extra;
+  const dot = scaleDot(result?.points.length ?? 0);
   const pct = Math.round(progress * 100);
 
   return (
@@ -151,9 +153,9 @@ export function PMIPlot({ compounds, fetchSample, cacheKey }: Props) {
                 key={i}
                 cx={px(p.npr1)}
                 cy={py(p.npr2)}
-                r={1.7}
+                r={dot.r}
                 fill="var(--chart)"
-                fillOpacity={0.4}
+                fillOpacity={dot.opacity}
               >
                 <title>{p.id}</title>
               </circle>

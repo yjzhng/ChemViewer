@@ -22,11 +22,13 @@ export function App() {
   const setResolvedTheme = useStore((s) => s.setResolvedTheme);
   const loadSubsets = useStore((s) => s.loadSubsets);
   const initFromManifest = useStore((s) => s.initFromManifest);
+  const loadComparisons = useStore((s) => s.loadComparisons);
 
   useEffect(() => {
     loadSubsets();
     initFromManifest();
-  }, [loadSubsets, initFromManifest]);
+    loadComparisons();
+  }, [loadSubsets, initFromManifest, loadComparisons]);
 
   useEffect(() => {
     const mq = window.matchMedia('(prefers-color-scheme: dark)');

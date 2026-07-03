@@ -1,5 +1,6 @@
 import { defineConfig, type Plugin, type ViteDevServer } from 'vite';
 import react from '@vitejs/plugin-react';
+import { nodePolyfills } from 'vite-plugin-node-polyfills';
 import {
   copyFileSync,
   createReadStream,
@@ -259,7 +260,14 @@ function libraryServer(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [copyRdkitAssets(), libraryServer(), react()],
+  // Ketcher (the structure sketcher) bundles Node-style code (global, process,
+  // Buffer); these polyfills are what make it run in the browser under Vite.
+  plugins: [
+    copyRdkitAssets(),
+    libraryServer(),
+    react(),
+    nodePolyfills({ globals: { global: true, process: true, Buffer: true } }),
+  ],
   server: { port: 5173 },
   // The compute worker dynamically imports OpenChemLib, which needs code
   // splitting — only the ES worker format supports that.

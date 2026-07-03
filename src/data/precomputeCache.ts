@@ -82,6 +82,23 @@ export async function pcHas(key: string): Promise<boolean> {
   });
 }
 
+/** Delete a single cached key. */
+export async function pcDelete(key: string): Promise<void> {
+  const db = await openDb();
+  if (!db) return;
+  return new Promise((resolve) => {
+    try {
+      const tx = db.transaction(STORE, 'readwrite');
+      tx.objectStore(STORE).delete(key);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => resolve();
+      tx.onabort = () => resolve();
+    } catch {
+      resolve();
+    }
+  });
+}
+
 /** Delete every cached artifact (Settings → clear precompute cache). */
 export async function pcClear(): Promise<void> {
   const db = await openDb();

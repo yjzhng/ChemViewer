@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { useStore } from '../data/store';
 import { loadLibraryFromManifest } from '../data/loaders/manifest';
 import { dbSample } from '../data/dbClient';
@@ -11,6 +11,8 @@ import {
 } from '../chem/precompute';
 import type { Compound } from '../data/types';
 
+type Sampler = (n: number) => Promise<Compound[]>;
+
 /**
  * Headless background orchestrator. On startup it precomputes the two expensive
  * artifacts (similarity map + PMI shape) for every detected library, one at a
@@ -21,86 +23,111 @@ import type { Compound } from '../data/types';
  */
 export function PrecomputeManager() {
   const manifest = useStore((s) => s.manifest);
-  const libraryLoading = useStore((s) => s.libraryLoading);
   const setLibStatus = useStore((s) => s.setLibStatus);
   const cacheLibrary = useStore((s) => s.cacheLibrary);
-  const started = useRef(false);
-  const cancelled = useRef(false);
 
+  // Depends ONLY on the manifest (stable after the initial scan) — NOT on
+  // `libraryLoading`, which toggles when a library opens and would cancel the
+  // whole queue. `active` is a per-run flag (not a persistent ref) so React
+  // StrictMode's mount→unmount→remount doesn't permanently cancel precompute:
+  // the first run stops cleanly and the remount run actually does the work.
   useEffect(() => {
-    if (started.current || libraryLoading || manifest.length === 0) return;
-    started.current = true;
+    if (manifest.length === 0) return;
+    let active = true;
+
+    // Resolve a library's sampler (parsing memory libs once and caching them).
+    const getSampleFor = async (
+      entry: (typeof manifest)[number],
+    ): Promise<Sampler | null> => {
+      if (entry.backend === 'duckdb') {
+        return (n) => dbSample(entry.name, { rules: [], globalSearch: '' }, n);
+      }
+      const { cache } = useStore.getState();
+      let lib = cache[entry.name];
+      if (!lib) {
+        try {
+          lib = await loadLibraryFromManifest(entry);
+          cacheLibrary(lib);
+        } catch {
+          return null;
+        }
+      }
+      return async () => lib!.compounds;
+    };
 
     (async () => {
-      // Seed each library's status from what's already cached on disk.
-      const preReady: boolean[] = await Promise.all(
+      const key = (e: (typeof manifest)[number]) =>
+        baseViewKey({ id: e.name, name: e.name, backend: e.backend });
+
+      // Seed status from what's already cached on disk.
+      const seeded = await Promise.all(
         manifest.map(async (e) => {
-          const s = await precomputeStatus(
-            baseViewKey({ id: e.name, name: e.name, backend: e.backend }),
-          );
+          const s = await precomputeStatus(key(e));
           setLibStatus(e.name, {
             sim: s.sim ? 1 : 0,
             pmi: s.pmi ? 1 : 0,
-            state: s.sim && s.pmi ? 'ready' : 'queued',
+            // Ready once the similarity map exists (browsable); PMI can trail.
+            state: s.sim ? 'ready' : 'queued',
           });
-          return s.sim && s.pmi;
+          return s;
         }),
       );
 
-      // Precompute the rest, one library at a time.
+      // Pass 1 — similarity maps: makes libraries ready/browsable quickly.
       for (let i = 0; i < manifest.length; i++) {
-        if (cancelled.current) return;
-        if (preReady[i]) continue;
-
+        if (!active) return;
+        if (seeded[i].sim) continue;
         const entry = manifest[i];
-        const key = baseViewKey({
-          id: entry.name,
-          name: entry.name,
-          backend: entry.backend,
-        });
-        const { cache } = useStore.getState();
-
-        let getSample: (n: number) => Promise<Compound[]>;
-        try {
-          if (entry.backend === 'duckdb') {
-            getSample = (n) =>
-              dbSample(entry.name, { rules: [], globalSearch: '' }, n);
-          } else {
-            setLibStatus(entry.name, { state: 'loading' });
-            const lib = cache[entry.name] ?? (await loadLibraryFromManifest(entry));
-            if (!cache[entry.name]) cacheLibrary(lib);
-            getSample = async () => lib.compounds;
-          }
-        } catch {
+        setLibStatus(entry.name, { state: 'loading' });
+        const getSample = await getSampleFor(entry);
+        if (!getSample) {
           setLibStatus(entry.name, { state: 'error' });
           continue;
         }
-        if (cancelled.current) return;
+        if (!active) return;
         setLibStatus(entry.name, { state: 'precomputing' });
-
         try {
-          await ensureSim(key, getSample, {
-            shouldStop: () => cancelled.current,
+          await ensureSim(key(entry), getSample, {
+            shouldStop: () => !active,
             onProgress: (frac) => setLibStatus(entry.name, { sim: frac }),
           });
-          if (cancelled.current) return;
-          await ensurePMI(key, getSample, {
-            shouldStop: () => cancelled.current,
-            onProgress: (frac) => setLibStatus(entry.name, { pmi: frac }),
-          });
-          setLibStatus(entry.name, { state: 'ready', sim: 1, pmi: 1 });
         } catch (e) {
           if (e instanceof Cancelled) return;
           setLibStatus(entry.name, { state: 'error' });
+          continue;
+        }
+        if (!active) return;
+        setLibStatus(entry.name, { state: 'ready', sim: 1 });
+      }
+
+      // Pass 2 — PMI (3D shape): best-effort. OpenChemLib can be slow or hang on
+      // odd structures, so a failure/stall (caught by the worker watchdog) is
+      // ignored and never un-readies a library.
+      for (let i = 0; i < manifest.length; i++) {
+        if (!active) return;
+        if (seeded[i].pmi) continue;
+        const entry = manifest[i];
+        const getSample = await getSampleFor(entry);
+        if (!getSample) continue;
+        if (!active) return;
+        try {
+          await ensurePMI(key(entry), getSample, {
+            shouldStop: () => !active,
+            onProgress: (frac) => setLibStatus(entry.name, { pmi: frac }),
+          });
+          setLibStatus(entry.name, { pmi: 1 });
+        } catch (e) {
+          if (e instanceof Cancelled) return;
+          // best-effort — leave PMI progress as-is.
         }
       }
     })();
 
     return () => {
-      cancelled.current = true;
+      active = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [manifest, libraryLoading]);
+  }, [manifest]);
 
   return null;
 }

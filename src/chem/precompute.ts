@@ -20,7 +20,7 @@ import { pcGet, pcHas, pcSet, CACHE_VERSION } from '../data/precomputeCache';
 import type { NPR } from './pmi';
 import type { Compound, Library } from '../data/types';
 
-export const SIM_SAMPLE = 10000;
+export const SIM_SAMPLE = 3000;
 export const PMI_SAMPLE = 150;
 
 /** Thrown when a compute is abandoned via `shouldStop`; callers ignore it. */
@@ -116,6 +116,44 @@ interface EnsureOptions {
   onProgress?: (frac: number, label: string) => void;
 }
 
+type ProgressCb = (frac: number, label: string) => void;
+
+/**
+ * Broadcasts compute progress for a view key to every subscriber, so a compute
+ * started by one caller (e.g. the launch precompute) still reports progress to
+ * a later caller (e.g. the Browse stats panel) that shares its in-flight job.
+ * Remembers the last value so a late subscriber gets it immediately.
+ */
+function makeProgressHub() {
+  const subs = new Map<string, Set<ProgressCb>>();
+  const last = new Map<string, [number, string]>();
+  return {
+    sub(key: string, cb?: ProgressCb): () => void {
+      if (!cb) return () => {};
+      let set = subs.get(key);
+      if (!set) subs.set(key, (set = new Set()));
+      set.add(cb);
+      const l = last.get(key);
+      if (l) cb(l[0], l[1]);
+      return () => {
+        set!.delete(cb);
+        if (set!.size === 0) subs.delete(key);
+      };
+    },
+    emit(key: string, frac: number, label: string): void {
+      last.set(key, [frac, label]);
+      const set = subs.get(key);
+      if (set) for (const cb of [...set]) cb(frac, label);
+    },
+    clear(key: string): void {
+      last.delete(key);
+    },
+  };
+}
+
+const simHub = makeProgressHub();
+const pmiHub = makeProgressHub();
+
 /**
  * Await a worker job, wiring `shouldStop` to worker cancellation (polled) and
  * translating a cancelled rejection into our `Cancelled` sentinel.
@@ -151,31 +189,33 @@ export function ensureSim(
   getSample: (n: number) => Promise<Compound[]>,
   opts: EnsureOptions = {},
 ): Promise<SimResult> {
+  const unsub = simHub.sub(viewKey, opts.onProgress);
   const mem = simCache.get(viewKey);
   if (mem) {
     opts.onProgress?.(1, 'done');
+    unsub();
     return Promise.resolve(mem);
   }
   const inflight = simInFlight.get(viewKey);
-  if (inflight) return inflight;
+  if (inflight) return inflight.finally(unsub);
 
   const p = (async (): Promise<SimResult> => {
     const stored = await pcGet<SimPersist>(simDbKey(viewKey));
     if (stored) {
       const r = hydrateSim(stored);
       simCache.set(viewKey, r);
-      opts.onProgress?.(1, 'done');
+      simHub.emit(viewKey, 1, 'done');
       return r;
     }
 
-    opts.onProgress?.(0, 'fingerprints');
+    simHub.emit(viewKey, 0, 'fingerprints');
     const pool = await getSample(SIM_SAMPLE);
     const idx = sampleIndices(pool.length, SIM_SAMPLE);
     // Fingerprints + UMAP run in the worker (off the UI thread).
     const wire = await runJob(
       simRequest(
         idx.map((i) => pool[i].smiles),
-        (frac, phase) => opts.onProgress?.(frac, phase),
+        (frac, phase) => simHub.emit(viewKey, frac, phase),
       ),
       opts.shouldStop,
     );
@@ -193,12 +233,16 @@ export function ensureSim(
     await pcSet(simDbKey(viewKey), persist);
     const r = hydrateSim(persist);
     simCache.set(viewKey, r);
-    opts.onProgress?.(1, 'done');
+    simHub.emit(viewKey, 1, 'done');
     return r;
   })();
 
   simInFlight.set(viewKey, p);
-  return p.finally(() => simInFlight.delete(viewKey));
+  return p.finally(() => {
+    simInFlight.delete(viewKey);
+    simHub.clear(viewKey);
+    unsub();
+  });
 }
 
 // ---- PMI shape -------------------------------------------------------------
@@ -233,31 +277,33 @@ export function ensurePMI(
   getSample: (n: number) => Promise<Compound[]>,
   opts: EnsureOptions = {},
 ): Promise<PmiResult> {
+  const unsub = pmiHub.sub(viewKey, opts.onProgress);
   const mem = pmiCache.get(viewKey);
   if (mem) {
     opts.onProgress?.(1, 'done');
+    unsub();
     return Promise.resolve(mem);
   }
   const inflight = pmiInFlight.get(viewKey);
-  if (inflight) return inflight;
+  if (inflight) return inflight.finally(unsub);
 
   const p = (async (): Promise<PmiResult> => {
     const stored = await pcGet<PmiPersist>(pmiDbKey(viewKey));
     if (stored) {
       const r = hydratePmi(stored);
       pmiCache.set(viewKey, r);
-      opts.onProgress?.(1, 'done');
+      pmiHub.emit(viewKey, 1, 'done');
       return r;
     }
 
-    opts.onProgress?.(0, '3D conformers');
+    pmiHub.emit(viewKey, 0, '3D conformers');
     const pool = await getSample(PMI_SAMPLE);
     const idx = sampleIndices(pool.length, PMI_SAMPLE);
     // 3D conformer generation runs in the worker (off the UI thread).
     const nprs = await runJob(
       pmiRequest(
         idx.map((i) => pool[i].smiles),
-        (frac, phase) => opts.onProgress?.(frac, phase),
+        (frac, phase) => pmiHub.emit(viewKey, frac, phase),
       ),
       opts.shouldStop,
     );
@@ -272,12 +318,16 @@ export function ensurePMI(
     await pcSet(pmiDbKey(viewKey), persist);
     const r = hydratePmi(persist);
     pmiCache.set(viewKey, r);
-    opts.onProgress?.(1, 'done');
+    pmiHub.emit(viewKey, 1, 'done');
     return r;
   })();
 
   pmiInFlight.set(viewKey, p);
-  return p.finally(() => pmiInFlight.delete(viewKey));
+  return p.finally(() => {
+    pmiInFlight.delete(viewKey);
+    pmiHub.clear(viewKey);
+    unsub();
+  });
 }
 
 // ---- launch-screen helpers -------------------------------------------------

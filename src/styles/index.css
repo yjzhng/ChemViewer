@@ -1062,6 +1062,7 @@ table.grid tbody tr.selected:hover td {
 .analyse-results {
   display: flex;
   flex-wrap: wrap;
+  align-items: flex-start;
   gap: 18px;
   margin-top: 10px;
 }
@@ -1147,6 +1148,13 @@ table.grid tbody tr.selected:hover td {
 .ketcher-host > * {
   position: absolute;
   inset: 0;
+}
+
+.sketch-status {
+  max-width: 40ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ---- Dialog ---- */
@@ -1566,4 +1574,758 @@ table.grid tbody tr.selected:hover td {
 
 .libcard-bar-fill.err {
   background: var(--danger);
+}
+
+/* ---- Analyse: multi-source picker + matrix ---- */
+.analyse-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 560px;
+  max-height: 240px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px;
+  margin: 14px 0;
+}
+
+.analyse-pick {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 5px 7px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.analyse-pick:hover {
+  background: var(--hover);
+}
+
+.analyse-pick span:nth-of-type(1) {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.analyse-pick-kind {
+  font-size: 11px;
+  flex: 0 0 auto;
+}
+
+.legend.wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.small {
+  font-size: 12px;
+}
+
+.sim-matrix {
+  border-collapse: collapse;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.sim-matrix th,
+.sim-matrix td {
+  border: 1px solid var(--border);
+  padding: 5px 8px;
+  text-align: center;
+}
+
+.sim-matrix th .swatch {
+  margin-right: 5px;
+}
+
+.sim-matrix .rowhead {
+  text-align: left;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.sim-matrix td.diag {
+  font-weight: 600;
+}
+
+/* ---- Analyse: Create / Result ---- */
+.analyse-create {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  min-height: 0;
+  height: 100%;
+}
+
+.cmp-list {
+  border-right: 1px solid var(--border);
+  overflow: auto;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cmp-new {
+  width: 100%;
+  margin-bottom: 6px;
+}
+
+.cmp-empty {
+  font-size: 12px;
+  padding: 8px;
+}
+
+.cmp-tile {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 9px;
+  border-radius: 6px;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.cmp-tile:hover {
+  background: var(--hover);
+}
+
+.cmp-tile.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.cmp-tile-name {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 13px;
+}
+
+.cmp-tile-n {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.ready-dot.run {
+  background: #e0b341;
+}
+
+.cmp-editor {
+  overflow: auto;
+  padding: 16px 20px;
+}
+
+.cmp-hint {
+  padding: 30px 0;
+}
+
+.cmp-name {
+  font-size: 16px;
+  font-weight: 600;
+  width: 100%;
+  max-width: 460px;
+  padding: 6px 8px;
+  margin-bottom: 14px;
+}
+
+.cmp-editor h4 {
+  margin: 6px 0 8px;
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.cmp-sources {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 560px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px;
+}
+
+.cmp-src {
+  border-radius: 6px;
+  padding: 3px;
+}
+
+.cmp-src.on {
+  background: var(--panel);
+}
+
+.cmp-src-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 5px 6px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.cmp-src-label {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cmp-src-kind {
+  font-size: 11px;
+}
+
+.cmp-src-config {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 4px 8px 8px 30px;
+}
+
+.cmp-swatches {
+  display: flex;
+  gap: 4px;
+}
+
+.cmp-swatch {
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  padding: 0;
+  border: 2px solid transparent;
+  cursor: pointer;
+}
+
+.cmp-swatch.active {
+  border-color: var(--text);
+}
+
+.cmp-sampling {
+  flex: 0 0 auto;
+}
+
+.cmp-num {
+  width: 84px;
+  padding: 4px 6px;
+}
+
+.cmp-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+  max-width: 560px;
+}
+
+.cmp-del {
+  color: var(--danger);
+}
+
+.cmp-progress {
+  height: 5px;
+  border-radius: 3px;
+  background: var(--panel-2);
+  overflow: hidden;
+  margin-top: 12px;
+  max-width: 560px;
+}
+
+.cmp-progress-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 3px;
+  transition: width 0.2s ease;
+}
+
+.analyse-result-view {
+  padding: 16px 20px;
+  overflow: auto;
+}
+
+/* ---- Analyse: property overlays + options ---- */
+.analyse-results > .legend.wrap {
+  flex-basis: 100%;
+}
+
+.analyse-card.wide {
+  flex-basis: 100%;
+}
+
+.prop-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.prop-chart {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 7px 9px;
+}
+
+.prop-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 11px;
+  margin-bottom: 4px;
+}
+
+.prop-head span:first-child {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.prop-svg {
+  width: 100%;
+  height: 46px;
+  display: block;
+}
+
+.cmp-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  font-size: 13px;
+  cursor: pointer;
+  max-width: 560px;
+}
+
+/* ---- Analyse: analysis-type checklist ---- */
+.cmp-analyses {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 560px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px;
+}
+
+.cmp-analysis {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  padding: 5px 7px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.cmp-analysis:hover {
+  background: var(--hover);
+}
+
+.cmp-analysis-label {
+  flex: 0 0 auto;
+}
+
+/* ---- Analyse: grouped analysis options ---- */
+.cmp-analysis-group + .cmp-analysis-group {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.cmp-analysis-group-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  padding: 2px 7px 4px;
+}
+
+/* ---- Analyse: result category sections ---- */
+.analyse-results-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.result-section {
+  padding-top: 6px;
+}
+
+.result-section-title {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--muted);
+  margin: 6px 0 2px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* ---- Analyse: source row (color dot + inline sampling) ---- */
+.cmp-src-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 6px;
+}
+
+.cmp-src-row .spacer,
+.cmp-analysis .spacer {
+  flex: 1 1 auto;
+}
+
+.cmp-src-check {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  cursor: pointer;
+  min-width: 0;
+  flex: 0 1 auto;
+  font-size: 13px;
+}
+
+.cmp-src-check .cmp-src-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cmp-color-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  padding: 0;
+  border: 2px solid var(--panel-2);
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+
+.cmp-color-menu {
+  display: flex;
+  gap: 5px;
+  padding: 2px 6px 8px 32px;
+}
+
+/* ---- Analyse: analysis option + info tooltip ---- */
+.cmp-analysis {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 5px 7px;
+  border-radius: 5px;
+  font-size: 13px;
+}
+
+.cmp-analysis:hover {
+  background: var(--hover);
+}
+
+.cmp-analysis-check {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  cursor: pointer;
+}
+
+.info-icon {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 10px;
+  font-style: italic;
+  font-weight: 700;
+  cursor: help;
+  flex: 0 0 auto;
+}
+
+.info-tip {
+  display: none;
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 5;
+  width: 224px;
+  flex-direction: column;
+  gap: 5px;
+  padding: 10px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.32);
+  cursor: default;
+}
+
+.info-icon:hover .info-tip,
+.info-icon:focus .info-tip,
+.info-icon:focus-within .info-tip {
+  display: flex;
+}
+
+.info-tip-title {
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.ex-svg {
+  width: 100%;
+  height: 74px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  margin-top: 3px;
+}
+
+/* ---- Analyse: pill colour selector + compact sampling + superscript info ---- */
+.cmp-color-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 4px;
+  border-radius: 999px;
+  background: var(--panel-2);
+  flex: 0 0 auto;
+}
+
+/* Compact sampling toggle */
+.cmp-sampling button {
+  padding: 2px 8px;
+  font-size: 11px;
+}
+
+.cmp-num-inline {
+  width: 52px;
+  border: none;
+  border-radius: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 11px;
+  text-align: center;
+  padding: 2px 4px;
+  -moz-appearance: textfield;
+}
+
+.cmp-num-inline:focus {
+  outline: none;
+}
+
+/* Info icon as a small superscript right after the analysis name */
+.cmp-analysis-label {
+  position: relative;
+}
+
+.info-icon {
+  vertical-align: super;
+  margin-left: 3px;
+  width: 12px;
+  height: 12px;
+  font-size: 8px;
+  line-height: 1;
+}
+
+.info-tip {
+  left: 0;
+  right: auto;
+}
+
+/* ---- Analyse: sample size label + pill sampling + accent numbox ---- */
+.cmp-sample-size {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  flex: 0 0 auto;
+}
+
+/* Pill-shaped sampling toggle */
+.cmp-sampling {
+  border-radius: 999px;
+}
+
+/* Number box: accent-highlighted (it's the active selection), no spinner arrows */
+.cmp-num-inline {
+  background: var(--accent);
+  color: var(--accent-fg);
+  font-weight: 600;
+}
+
+.cmp-num-inline::-webkit-inner-spin-button,
+.cmp-num-inline::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* Circular dots for the comparison result legend */
+.legend .swatch {
+  border-radius: 50%;
+}
+
+/* ---- Analyse: recolour a set from the result legend ---- */
+.legend-color {
+  position: relative;
+  display: inline-flex;
+}
+
+.legend button.swatch {
+  padding: 0;
+  border: 1px solid var(--border);
+  cursor: pointer;
+}
+
+.legend-color-menu {
+  position: absolute;
+  top: calc(100% + 5px);
+  left: 0;
+  z-index: 6;
+  display: flex;
+  gap: 5px;
+  padding: 6px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+}
+
+/* Bigger legend dots; circular set dots in result tables too */
+.legend .swatch {
+  width: 13px;
+  height: 13px;
+}
+
+.sim-matrix .swatch {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+}
+
+/* ---- Analyse: editor header (name + delete) + run estimate ---- */
+.cmp-editor-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.cmp-editor-head .cmp-name {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+.cmp-estimate {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Structural-similarity layout: two matrix tables in a column, map to the right */
+.sim-tables {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+/* ---- Analyse: QED bars + SMARTS rate tables ---- */
+.qed-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.qed-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.qed-label {
+  flex: 0 0 130px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.qed-track {
+  flex: 1;
+  height: 8px;
+  background: var(--panel-2);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.qed-fill {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+}
+
+.qed-val {
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.rates-table td {
+  min-width: 34px;
+}
+
+/* ---- Ketcher dark theme (follows the app; canvas stays light + dotted so the
+   black-drawn structure remains visible). Override Ketcher's own :root theme
+   variables at higher specificity + !important so it beats their defaults and
+   any portalled (out-of-.ketcher-host) UI. ---- */
+:root[data-theme='dark'] {
+  --color-background-primary: #1c1f26 !important;
+  --color-background-secondary: #242832 !important;
+  --color-background-overlay: rgba(0, 0, 0, 0.55) !important;
+  --color-border-primary: #313643 !important;
+  --color-border-secondary: #313643 !important;
+  --color-divider: #313643 !important;
+  --color-text-primary: #e7e9ee !important;
+  --color-text-dark: #e7e9ee !important;
+  --color-text-secondary: #9aa1ad !important;
+  --color-text-light: #9aa1ad !important;
+  --color-text-lightgrey: #9aa1ad !important;
+  --color-icon-grey: #9aa1ad !important;
+  --color-icon-hover: #e7e9ee !important;
+  --color-icon-active: #4f9cf9 !important;
+  --color-icon-clicked: #4f9cf9 !important;
+  --color-icon-disabled: #4a4f5a !important;
+  --color-button-group-hover: #2b303b !important;
+  --color-button-group-active: #313643 !important;
+  --color-button-secondary-hover: #2b303b !important;
+  --color-button-secondary-active: #2b303b !important;
+  --color-button-secondary-clicked: #313643 !important;
+  --color-button-transparent-active: #2b303b !important;
+  --color-dropdown-primary: #1c1f26 !important;
+  --color-dropdown-secondary: #242832 !important;
+  --color-dropdown-hover: #2b303b !important;
+  --color-input-background-primary: #15171c !important;
+  --color-input-background-default: #15171c !important;
+  --color-input-background-hover: #1c1f26 !important;
+  /* keep the canvas light so black-drawn structures stay visible */
+  --color-background-canvas: #eceef2 !important;
+}
+
+/* Faint dotted grid on the canvas area (its wrapper within Ketcher). */
+[data-theme='dark'] .ketcher-host [class*='canvas'],
+[data-theme='dark'] .ketcher-host [class*='Canvas'] {
+  background-color: #eceef2;
+  background-image: radial-gradient(circle, rgba(70, 80, 100, 0.3) 1px, transparent 1.5px);
+  background-size: 18px 18px;
 }

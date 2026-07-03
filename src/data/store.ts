@@ -18,6 +18,22 @@ import {
   loadLibraryFromManifest,
   type ManifestEntry,
 } from './loaders/manifest';
+import {
+  computeComparison,
+  comparisonSig,
+  loadComparisons as loadComparisonsDb,
+  persistComparisons,
+  persistResult,
+  deleteResult,
+  samplingCount,
+  DB_ALL_CAP,
+  type Comparison,
+  type CmpSource,
+  type CmpStatus,
+} from './comparisons';
+import { materializeSubset } from './sources';
+import { dbSample } from './dbClient';
+import { sampleIndices } from '../stats/sample';
 import type { DrawOptions } from '../chem/render';
 
 export interface SubstructureState {
@@ -163,6 +179,17 @@ interface AppState {
   /** Currently-applied saved subset, or null for "Full"/custom. */
   activeSubsetId: string | null;
 
+  /** Saved Analyse comparison jobs (persisted config + status). */
+  comparisons: Comparison[];
+  /** Live compute progress (0..1) for running comparisons, keyed by id. */
+  comparisonProgress: Record<string, number>;
+  loadComparisons: () => Promise<void>;
+  /** Insert or update a comparison and persist the list. */
+  saveComparison: (cmp: Comparison) => Promise<void>;
+  removeComparison: (id: string) => Promise<void>;
+  /** Run a comparison in the worker, persisting its result when ready. */
+  runComparison: (cmp: Comparison) => Promise<void>;
+
   setPage: (page: AppPage) => void;
   setLibrary: (library: Library) => void;
   /** Scan the bundled library/ folder and auto-load the first source. */
@@ -246,7 +273,7 @@ export const useStore = create<AppState>((set, get) => ({
   settingsOpen: false,
   setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
   library: null,
-  libraryView: 'browse',
+  libraryView: 'manage',
   setLibraryView: (libraryView) => set({ libraryView }),
   libStatus: {},
   setLibStatus: (name, patch) =>
@@ -280,6 +307,89 @@ export const useStore = create<AppState>((set, get) => ({
   setHoveredCompound: (hoveredCompound) => set({ hoveredCompound }),
   subsets: [],
   activeSubsetId: null,
+  comparisons: [],
+  comparisonProgress: {},
+
+  loadComparisons: async () => {
+    set({ comparisons: await loadComparisonsDb() });
+  },
+
+  saveComparison: async (cmp) => {
+    set((s) => {
+      const exists = s.comparisons.some((c) => c.id === cmp.id);
+      return {
+        comparisons: exists
+          ? s.comparisons.map((c) => (c.id === cmp.id ? cmp : c))
+          : [...s.comparisons, cmp],
+      };
+    });
+    await persistComparisons(get().comparisons);
+  },
+
+  removeComparison: async (id) => {
+    set((s) => ({ comparisons: s.comparisons.filter((c) => c.id !== id) }));
+    await persistComparisons(get().comparisons);
+    await deleteResult(id);
+  },
+
+  runComparison: async (cmp) => {
+    const running: Comparison = { ...cmp, status: 'running' as CmpStatus };
+    await get().saveComparison(running);
+    set((s) => ({ comparisonProgress: { ...s.comparisonProgress, [cmp.id]: 0 } }));
+
+    // Resolve one source to its sampled compounds (parsing memory libs on
+    // demand; DuckDB libs are sampled on disk).
+    const sampleSource = async (src: CmpSource) => {
+      const st = get();
+      const n = samplingCount(src.sampling, src.backend);
+      if (src.kind === 'library' && src.backend === 'duckdb') {
+        return dbSample(
+          src.libName,
+          { rules: [], globalSearch: '' },
+          Number.isFinite(n) ? (n as number) : DB_ALL_CAP,
+        );
+      }
+      let lib = st.cache[src.libName] ?? st.extras[src.libName] ?? null;
+      if (!lib) {
+        const entry = st.manifest.find((m) => m.name === src.libName);
+        if (!entry) return [];
+        lib = await loadLibraryFromManifest(entry);
+        get().cacheLibrary(lib);
+      }
+      let pool = lib.compounds;
+      if (src.kind === 'subset') {
+        const sub = st.subsets.find((x) => x.id === src.subsetId);
+        pool = sub ? materializeSubset(sub, lib) : [];
+      }
+      if (!Number.isFinite(n)) return pool;
+      return sampleIndices(pool.length, n as number).map((i) => pool[i]);
+    };
+
+    try {
+      const result = await computeComparison(running, sampleSource, (frac) =>
+        set((s) => ({
+          comparisonProgress: { ...s.comparisonProgress, [cmp.id]: frac },
+        })),
+      );
+      await persistResult(cmp.id, result);
+      await get().saveComparison({
+        ...running,
+        status: 'ready',
+        error: undefined,
+        computedSig: comparisonSig(running),
+      });
+    } catch (e) {
+      const error = String((e as Error)?.message ?? e);
+      console.error('[comparison] compute failed:', e);
+      await get().saveComparison({ ...running, status: 'error', error });
+    } finally {
+      set((s) => {
+        const p = { ...s.comparisonProgress };
+        delete p[cmp.id];
+        return { comparisonProgress: p };
+      });
+    }
+  },
 
   setPage: (page) => set({ page }),
 
@@ -295,13 +405,15 @@ export const useStore = create<AppState>((set, get) => ({
     })),
 
   initFromManifest: async () => {
+    // Only scan for the manifest here — don't parse any library. Parsing a
+    // source file (tens of thousands of rows) is the slow part of "opening" a
+    // library, and it's independent of the precompute cache. Libraries are now
+    // parsed on demand when the user opens one from the Manage view, so launch
+    // stays instant even when everything is already precomputed.
     set({ libraryLoading: true, loadError: null });
     try {
       const manifest = await fetchManifest();
       set({ manifest });
-      if (manifest.length > 0 && !get().library) {
-        get().setLibrary(await loadLibraryFromManifest(manifest[0]));
-      }
     } catch (err) {
       set({ loadError: String((err as Error)?.message ?? err) });
     } finally {

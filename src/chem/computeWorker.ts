@@ -21,13 +21,50 @@ const ctx = self as unknown as {
   }) => Promise<RDKitLike>;
 };
 
+interface RDKitQMol {
+  is_valid(): boolean;
+  delete(): void;
+}
 interface RDKitLike {
   get_mol(smiles: string): {
     is_valid(): boolean;
     get_morgan_fp(options: string): string;
+    get_descriptors(): string;
+    get_substruct_match(q: RDKitQMol): string;
     delete(): void;
   } | null;
+  get_qmol(smarts: string): RDKitQMol | null;
 }
+
+/** True if `mol` contains the SMARTS query `q`. */
+function matchesSmarts(
+  mol: { get_substruct_match(q: RDKitQMol): string } | null,
+  q: RDKitQMol | null,
+): number {
+  if (!mol || !q) return 0;
+  try {
+    const j = JSON.parse(mol.get_substruct_match(q)) as { atoms?: number[] };
+    return Array.isArray(j.atoms) && j.atoms.length > 0 ? 1 : 0;
+  } catch {
+    return 0;
+  }
+}
+
+// Descriptors returned alongside fingerprints (RDKit get_descriptors keys).
+export const DESC_KEYS = [
+  'amw',
+  'CrippenClogP',
+  'tpsa',
+  'NumHBD',
+  'NumHBA',
+  'NumRotatableBonds',
+  'NumAromaticRings',
+  'FractionCSP3',
+  'NumRings',
+  'NumAliphaticRings',
+  'NumAromaticHeterocycles',
+  'NumAtomStereoCenters',
+];
 
 // ---- fingerprint math (kept local so the worker needn't import DOM code) ----
 const FP_BITS = 1024;
@@ -82,32 +119,63 @@ function getRDKit(): Promise<RDKitLike> {
   return rdkitPromise;
 }
 
+interface Features {
+  fp: number[] | null;
+  desc: number[] | null;
+}
+// Fingerprints and descriptors are cached separately: descriptors cost ~3× a
+// fingerprint (RDKit get_descriptors), so they're only computed when a caller
+// asks for them (comparisons) — never for the per-library similarity map.
 const fpCache = new Map<string, number[] | null>();
+const descCache = new Map<string, number[] | null>();
 const cancelled = new Set<number>();
 
-async function fingerprintBatch(
+function extractDesc(json: string): number[] | null {
+  try {
+    const j = JSON.parse(json) as Record<string, number>;
+    return DESC_KEYS.map((k) =>
+      typeof j[k] === 'number' && Number.isFinite(j[k]) ? j[k] : NaN,
+    );
+  } catch {
+    return null;
+  }
+}
+
+/** Morgan fingerprint (+ descriptors when `withDesc`) per SMILES, cached. */
+async function featureBatch(
   smiles: string[],
   id: number,
+  withDesc: boolean,
   onProgress: (frac: number) => void,
-): Promise<(number[] | null)[] | null> {
+): Promise<Features[] | null> {
   const rdkit = await getRDKit();
-  const out: (number[] | null)[] = [];
+  const out: Features[] = [];
   for (let i = 0; i < smiles.length; i++) {
     if (cancelled.has(id)) return null;
     const s = smiles[i];
-    let v = fpCache.get(s);
-    if (v === undefined) {
+    let fp = fpCache.get(s);
+    let desc = withDesc ? descCache.get(s) : null;
+    if (fp === undefined || (withDesc && desc === undefined)) {
       const mol = rdkit.get_mol(s);
-      let fp: number[] | null = null;
+      const valid = !!(mol && mol.is_valid());
       try {
-        if (mol && mol.is_valid()) fp = packBitString(mol.get_morgan_fp(FP_OPTIONS));
+        if (fp === undefined) {
+          fp = valid ? packBitString(mol!.get_morgan_fp(FP_OPTIONS)) : null;
+          fpCache.set(s, fp);
+        }
+        if (withDesc && desc === undefined) {
+          try {
+            desc = valid ? extractDesc(mol!.get_descriptors()) : null;
+          } catch {
+            desc = null; // descriptors unavailable — fingerprints still work
+          }
+          descCache.set(s, desc);
+        }
       } finally {
         mol?.delete();
       }
-      fpCache.set(s, fp);
-      v = fp;
     }
-    out.push(v);
+    out.push({ fp: fp ?? null, desc: desc ?? null });
     if ((i & 511) === 511) {
       onProgress((i + 1) / smiles.length);
       await new Promise((r) => setTimeout(r));
@@ -134,42 +202,79 @@ ctx.onmessage = async (e: MessageEvent) => {
   try {
     if (d.kind === 'sim') {
       const smiles = d.smiles as string[];
-      const fps = await fingerprintBatch(smiles, id, (frac) =>
+      const withDesc = !!(d as { withDescriptors?: boolean }).withDescriptors;
+      const withLayout = (d as { withLayout?: boolean }).withLayout !== false;
+      const feats = await featureBatch(smiles, id, withDesc, (frac) =>
         post({ type: 'progress', id, frac: frac * 0.85, phase: 'fingerprints' }),
       );
-      if (fps === null || cancelled.has(id)) return post({ type: 'cancelled', id });
+      if (feats === null || cancelled.has(id)) return post({ type: 'cancelled', id });
 
       const vectors: number[][] = [];
       const keep: number[] = [];
-      for (let k = 0; k < fps.length; k++) {
-        const fp = fps[k];
-        if (fp) {
-          vectors.push(fp);
+      const descriptors: number[][] = [];
+      for (let k = 0; k < feats.length; k++) {
+        const f = feats[k];
+        if (f.fp) {
+          vectors.push(f.fp);
           keep.push(k);
+          descriptors.push(f.desc ?? []);
         }
       }
       if (vectors.length < 5) {
         return post({ type: 'error', id, message: 'Too few valid structures to map.' });
       }
 
-      post({ type: 'progress', id, frac: 0.88, phase: 'layout' });
-      const umap = new UMAP({
-        nComponents: 2,
-        nNeighbors: Math.min(15, vectors.length - 1),
-        minDist: 0.1,
-        distanceFn: tanimotoDistanceWords,
-        random: seededRandom(42),
-      });
-      const embedding = await umap.fitAsync(vectors);
-      if (cancelled.has(id)) return post({ type: 'cancelled', id });
+      let points: { x: number; y: number }[] = [];
+      if (withLayout) {
+        post({ type: 'progress', id, frac: 0.88, phase: 'layout' });
+        const umap = new UMAP({
+          nComponents: 2,
+          nNeighbors: Math.min(15, vectors.length - 1),
+          minDist: 0.1,
+          distanceFn: tanimotoDistanceWords,
+          random: seededRandom(42),
+        });
+        // Heartbeat each epoch so the main-thread watchdog doesn't mistake a long
+        // (but healthy) layout for a stall.
+        let epoch = 0;
+        const embedding = await umap.fitAsync(vectors, () => {
+          if (epoch++ % 20 === 0) post({ type: 'progress', id, frac: 0.9, phase: 'layout' });
+        });
+        if (cancelled.has(id)) return post({ type: 'cancelled', id });
+        points = embedding.map((xy) => ({ x: xy[0], y: xy[1] }));
+      }
+
+      // Optional SMARTS-panel matching (functional groups / structural alerts):
+      // one 0/1 vector per kept compound, aligned to `keep`.
+      let smartsHits: number[][] | undefined;
+      const smarts = (d as { smarts?: string[] }).smarts;
+      if (smarts && smarts.length) {
+        post({ type: 'progress', id, frac: 0.95, phase: 'substructure' });
+        const rdkit = await getRDKit();
+        const qmols = smarts.map((s) => rdkit.get_qmol(s));
+        smartsHits = [];
+        for (const k of keep) {
+          if (cancelled.has(id)) {
+            qmols.forEach((q) => q?.delete());
+            return post({ type: 'cancelled', id });
+          }
+          const mol = rdkit.get_mol(smiles[k]);
+          smartsHits.push(qmols.map((q) => matchesSmarts(mol, q)));
+          mol?.delete();
+        }
+        qmols.forEach((q) => q?.delete());
+      }
 
       post({
         type: 'done',
         id,
         result: {
-          points: embedding.map((xy) => ({ x: xy[0], y: xy[1] })),
+          points,
           keep,
           vectors,
+          descriptors,
+          descriptorKeys: DESC_KEYS,
+          smartsHits,
           sampled: vectors.length,
         },
       });
