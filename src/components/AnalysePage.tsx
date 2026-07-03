@@ -21,9 +21,27 @@ import {
 } from '../data/comparisons';
 import { ScatterPlot, scaleDot, categoryColor, type ScatterPoint } from './ScatterPlot';
 
-type AnalyseView = 'create' | 'result';
-
 const PALETTE = Array.from({ length: 10 }, (_, i) => categoryColor(i));
+
+/** Small pencil icon for the "rename" affordance. */
+function PencilIcon() {
+  return (
+    <svg
+      width="13"
+      height="13"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+    </svg>
+  );
+}
 
 interface AvailSource {
   sourceId: string;
@@ -894,6 +912,9 @@ function CreateView() {
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [pickerFor, setPickerFor] = useState<string | null>(null);
+  const [renaming, setRenaming] = useState(false);
+  // Leave rename mode when switching tiles.
+  useEffect(() => setRenaming(false), [selectedId]);
 
   const blank = (): Comparison => ({
     id: crypto.randomUUID(),
@@ -1038,11 +1059,27 @@ function CreateView() {
         ) : (
           <>
             <div className="cmp-editor-head">
-              <input
-                className="cmp-name"
-                value={editing.name}
-                onChange={(e) => commit({ ...editing, name: e.target.value })}
-              />
+              {renaming ? (
+                <input
+                  className="cmp-name"
+                  autoFocus
+                  value={editing.name}
+                  onChange={(e) => commit({ ...editing, name: e.target.value })}
+                  onBlur={() => setRenaming(false)}
+                  onKeyDown={(e) => e.key === 'Enter' && setRenaming(false)}
+                />
+              ) : (
+                <div className="cmp-title">
+                  <span className="cmp-title-text">{editing.name}</span>
+                  <button
+                    className="cmp-name-edit"
+                    title="Rename"
+                    onClick={() => setRenaming(true)}
+                  >
+                    <PencilIcon />
+                  </button>
+                </div>
+              )}
               <button
                 className="cmp-del"
                 title="Delete comparison"
@@ -1056,6 +1093,8 @@ function CreateView() {
               </button>
             </div>
 
+            <div className="cmp-config-row">
+              <div className="cmp-config-col">
             <h4>Libraries &amp; subsets</h4>
             <div className="cmp-sources">
               {avail.map((a) => {
@@ -1156,7 +1195,9 @@ function CreateView() {
                 );
               })}
             </div>
+              </div>
 
+              <div className="cmp-config-col">
             <h4>Analyses</h4>
             <div className="cmp-analyses">
               {ANALYSIS_GROUPS.map((g) => {
@@ -1194,6 +1235,8 @@ function CreateView() {
                   </div>
                 );
               })}
+            </div>
+              </div>
             </div>
 
             <div className="cmp-actions">
@@ -1233,6 +1276,10 @@ function CreateView() {
                 />
               </div>
             )}
+
+            {storedStatus === 'ready' && !running && (
+              <ResultSection comparison={editing} dirty={dirty} />
+            )}
           </>
         )}
       </section>
@@ -1240,19 +1287,28 @@ function CreateView() {
   );
 }
 
-// ---- result view -----------------------------------------------------------
+// ---- result section (rendered below the config once a comparison is ready) --
 
-function ResultView() {
+function ResultSection({ comparison, dirty }: { comparison: Comparison; dirty: boolean }) {
   const comparisons = useStore((s) => s.comparisons);
   const saveComparison = useStore((s) => s.saveComparison);
-  const ready = comparisons.filter((c) => c.status === 'ready');
-  const [selectedId, setSelectedId] = useState<string>('');
   const [result, setResult] = useState<CmpResult | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const currentId = ready.some((c) => c.id === selectedId)
-    ? selectedId
-    : ready[0]?.id ?? '';
+  // Reload whenever the selected comparison changes or it's re-run (new sig).
+  useEffect(() => {
+    let alive = true;
+    setLoading(true);
+    loadResult(comparison.id).then((r) => {
+      if (alive) {
+        setResult(r);
+        setLoading(false);
+      }
+    });
+    return () => {
+      alive = false;
+    };
+  }, [comparison.id, comparison.computedSig]);
 
   // Recolour a set live: update the plots + persisted result, and sync the
   // matching source's colour in the comparison config (so a re-run keeps it).
@@ -1266,12 +1322,12 @@ function ResultView() {
       ...result,
       groups: result.groups.map((g, i) => (i === gi ? { ...g, color } : g)),
       points: result.points.map((p) => (p.label === label ? { ...p, color } : p)),
-      pca: result.pca ? { points: result.pca.points.map(recol) } : result.pca,
+      pca: result.pca ? { ...result.pca, points: result.pca.points.map(recol) } : result.pca,
       pmi: result.pmi ? { points: result.pmi.points.map(recol) } : result.pmi,
     };
     setResult(updated);
-    persistResult(currentId, updated);
-    const cmp = comparisons.find((c) => c.id === currentId);
+    persistResult(comparison.id, updated);
+    const cmp = comparisons.find((c) => c.id === comparison.id);
     if (cmp) {
       saveComparison({
         ...cmp,
@@ -1280,49 +1336,14 @@ function ResultView() {
     }
   };
 
-  useEffect(() => {
-    if (!currentId) {
-      setResult(null);
-      return;
-    }
-    let alive = true;
-    setLoading(true);
-    loadResult(currentId).then((r) => {
-      if (alive) {
-        setResult(r);
-        setLoading(false);
-      }
-    });
-    return () => {
-      alive = false;
-    };
-  }, [currentId]);
-
-  if (ready.length === 0) {
-    return (
-      <div className="empty">
-        <h2>No ready comparisons</h2>
-        <p>Create and submit a comparison, then view its results here.</p>
-      </div>
-    );
-  }
-
   return (
-    <div className="analyse-result-view">
-      <div className="analyse-controls">
-        <label>
-          Comparison
-          <select value={currentId} onChange={(e) => setSelectedId(e.target.value)}>
-            {ready.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </label>
+    <div className="result-below">
+      <div className="result-below-head">
+        <h3>Results</h3>
+        {dirty && <span className="muted small">config changed — re-run to update</span>}
       </div>
       {loading ? (
-        <div className="muted">Loading…</div>
+        <div className="muted">Loading result…</div>
       ) : result ? (
         <ComparisonPlots result={result} onRecolor={recolor} />
       ) : (
@@ -1334,30 +1355,15 @@ function ResultView() {
 
 // ---- page shell ------------------------------------------------------------
 
-const VIEWS: { id: AnalyseView; label: string }[] = [
-  { id: 'create', label: 'Create' },
-  { id: 'result', label: 'Result' },
-];
-
 export function AnalysePage() {
-  const [view, setView] = useState<AnalyseView>('create');
   return (
     <div className="page">
       <header className="browse-header">
-        <div className="segmented view-toggle">
-          {VIEWS.map((v) => (
-            <button
-              key={v.id}
-              className={view === v.id ? 'active' : ''}
-              onClick={() => setView(v.id)}
-            >
-              {v.label}
-            </button>
-          ))}
-        </div>
+        <span className="muted small">
+          Compare libraries &amp; subsets — pick sources, choose analyses, submit.
+        </span>
       </header>
-
-      {view === 'create' ? <CreateView /> : <ResultView />}
+      <CreateView />
     </div>
   );
 }

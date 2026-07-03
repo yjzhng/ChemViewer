@@ -1,9 +1,10 @@
 import { useStore, type AppPage } from '../data/store';
 
 const PAGES: { id: AppPage; label: string }[] = [
+  { id: 'manage', label: 'Manage' },
   { id: 'browse', label: 'Library' },
   { id: 'analyse', label: 'Analyse' },
-  { id: 'sketch', label: 'Sketch' },
+  { id: 'search', label: 'Search' },
 ];
 
 function GearIcon() {

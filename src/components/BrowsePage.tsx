@@ -1,42 +1,17 @@
 import { useEffect, useMemo } from 'react';
-import { useStore, type LibraryView } from '../data/store';
+import { useStore } from '../data/store';
 import { applyFilters } from '../filters/engine';
 import { FilterBar } from './FilterBar';
 import { SubsetMenu } from './SubsetMenu';
 import { LibraryMenu } from './LibraryMenu';
-import { LibraryManager } from './LibraryManager';
 import { LibraryTable } from './LibraryTable';
 import { LibraryStats } from './LibraryStats';
 import { DbTable } from './DbTable';
 import { DbStats } from './DbStats';
 import { Switch } from './Switch';
 
-const VIEWS: { id: LibraryView; label: string }[] = [
-  { id: 'manage', label: 'Manage' },
-  { id: 'browse', label: 'Browse' },
-];
-
-function ViewToggle() {
-  const libraryView = useStore((s) => s.libraryView);
-  const setLibraryView = useStore((s) => s.setLibraryView);
-  return (
-    <div className="segmented view-toggle">
-      {VIEWS.map((v) => (
-        <button
-          key={v.id}
-          className={libraryView === v.id ? 'active' : ''}
-          onClick={() => setLibraryView(v.id)}
-        >
-          {v.label}
-        </button>
-      ))}
-    </div>
-  );
-}
-
 export function BrowsePage() {
   const library = useStore((s) => s.library);
-  const libraryView = useStore((s) => s.libraryView);
   const rules = useStore((s) => s.rules);
   const globalSearch = useStore((s) => s.globalSearch);
   const substructure = useStore((s) => s.substructure);
@@ -51,13 +26,13 @@ export function BrowsePage() {
   const libStatus = useStore((s) => s.libStatus);
   const selectLibraryByName = useStore((s) => s.selectLibraryByName);
 
-  // In Browse with nothing open yet, auto-open the first ready library so the
-  // user lands on data instead of the "open from Manage" prompt.
+  // With nothing open yet, auto-open the first ready library so the user lands
+  // on data instead of an empty prompt.
   useEffect(() => {
-    if (libraryView !== 'browse' || library || libraryLoading) return;
+    if (library || libraryLoading) return;
     const ready = manifest.find((m) => libStatus[m.name]?.state === 'ready');
     if (ready) selectLibraryByName(ready.name);
-  }, [libraryView, library, libraryLoading, manifest, libStatus, selectLibraryByName]);
+  }, [library, libraryLoading, manifest, libStatus, selectLibraryByName]);
 
   const memberIds = useMemo(() => {
     const sub = subsets.find((s) => s.id === activeSubsetId);
@@ -76,19 +51,16 @@ export function BrowsePage() {
   }, [library, rules, globalSearch, substructure, memberIds]);
 
   const isDb = library?.backend === 'duckdb';
-  const browsing = libraryView === 'browse';
 
   return (
     <div className="page">
       <header className="browse-header">
-        <ViewToggle />
-
-        {browsing && library && <LibraryMenu library={library} />}
-        {browsing && library && !isDb && <SubsetMenu library={library} />}
+        {library && <LibraryMenu library={library} />}
+        {library && !isDb && <SubsetMenu library={library} />}
 
         <span className="spacer" />
 
-        {browsing && library && (
+        {library && (
           <div className="toggle">
             <span>Structures</span>
             <Switch
@@ -100,29 +72,36 @@ export function BrowsePage() {
         )}
       </header>
 
-      {libraryView === 'manage' ? (
-        <LibraryManager />
-      ) : !library ? (
-        <div className="empty">
-          {libraryLoading ? (
-            <h2>Loading library…</h2>
-          ) : manifest.length > 0 ? (
-            <>
-              <h2>Preparing libraries…</h2>
-              <p>
-                Libraries are still precomputing. See <strong>Manage</strong> for
-                progress — this view opens automatically once one is ready.
-              </p>
-            </>
-          ) : (
-            <>
-              <h2>No libraries found</h2>
-              <p>
-                Open <strong>Manage</strong> to choose a directory to scan.
-              </p>
-            </>
-          )}
-        </div>
+      {!library ? (
+        libraryLoading || manifest.length > 0 ? (
+          // Keep the Browse shell (panels) and show the loading state only in
+          // the table area — parsing the rows is the slow part, not the chrome.
+          <div className="panels">
+            <section className="panel panel-mid">
+              <div className="table-loading">
+                {libraryLoading ? (
+                  <span className="muted">Loading library…</span>
+                ) : (
+                  <>
+                    <span className="muted">Preparing libraries…</span>
+                    <span className="muted small">
+                      Still precomputing — this opens automatically once one is
+                      ready (see <strong>Manage</strong> for progress).
+                    </span>
+                  </>
+                )}
+              </div>
+            </section>
+            <aside className="panel panel-right" />
+          </div>
+        ) : (
+          <div className="empty">
+            <h2>No libraries found</h2>
+            <p>
+              Open <strong>Manage</strong> to choose a directory to scan.
+            </p>
+          </div>
+        )
       ) : isDb ? (
         <div className="panels">
           <section className="panel panel-mid">

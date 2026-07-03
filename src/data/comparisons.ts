@@ -123,7 +123,28 @@ export function resolveAnalyses(cmp: {
   return { ...base, shape: !!cmp.includeShape };
 }
 
-export const blankAnalyses = (): CmpAnalyses => ({ ...DEFAULT_ANALYSES });
+// A new comparison starts with every analysis enabled (the user unchecks what
+// they don't want). DEFAULT_ANALYSES stays conservative — it's only the base
+// for filling missing keys on OLDER saved comparisons, so re-opening those
+// doesn't silently turn on analyses they never had.
+export const blankAnalyses = (): CmpAnalyses => ({
+  map: true,
+  crossSim: true,
+  overlap: true,
+  nnsim: true,
+  spaceOverlap: true,
+  properties: true,
+  metrics: true,
+  pca: true,
+  clusters: true,
+  ecdf: true,
+  bivariate: true,
+  rings: true,
+  funcGroups: true,
+  alerts: true,
+  qed: true,
+  shape: true,
+});
 
 export interface Comparison {
   id: string;

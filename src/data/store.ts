@@ -32,6 +32,7 @@ import {
   type CmpStatus,
 } from './comparisons';
 import { materializeSubset } from './sources';
+import type { SearchQuery } from './search';
 import { dbSample } from './dbClient';
 import { sampleIndices } from '../stats/sample';
 import type { DrawOptions } from '../chem/render';
@@ -42,10 +43,7 @@ export interface SubstructureState {
 }
 
 /** Top-level pages reachable from the main nav. */
-export type AppPage = 'browse' | 'analyse' | 'sketch';
-
-/** Sub-view of the Library page: the data browser, or the folder manager. */
-export type LibraryView = 'browse' | 'manage';
+export type AppPage = 'manage' | 'browse' | 'analyse' | 'search';
 
 /** Precompute lifecycle of a library (drives the manager + selector gating). */
 export type LibState =
@@ -134,9 +132,6 @@ interface AppState {
   settingsOpen: boolean;
   setSettingsOpen: (open: boolean) => void;
   library: Library | null;
-  /** Library page sub-view: browse the data or manage the folder. */
-  libraryView: LibraryView;
-  setLibraryView: (v: LibraryView) => void;
   /** Per-library precompute status (keyed by name) — drives manager + gating. */
   libStatus: Record<string, LibStatus>;
   setLibStatus: (name: string, patch: Partial<LibStatus>) => void;
@@ -190,6 +185,12 @@ interface AppState {
   /** Run a comparison in the worker, persisting its result when ready. */
   runComparison: (cmp: Comparison) => Promise<void>;
 
+  /** Search page query tiles (kept in memory so they survive navigation). */
+  searchQueries: SearchQuery[];
+  /** Insert or update a search query. */
+  saveSearchQuery: (q: SearchQuery) => void;
+  removeSearchQuery: (id: string) => void;
+
   setPage: (page: AppPage) => void;
   setLibrary: (library: Library) => void;
   /** Scan the bundled library/ folder and auto-load the first source. */
@@ -200,6 +201,10 @@ interface AppState {
   selectLibraryByName: (name: string) => Promise<void>;
   /** Register a folder-loaded library and make it active. */
   addExtraLibrary: (library: Library, directoryLabel: string) => void;
+  /** Register an authored/merged in-memory library and make it active. */
+  registerLibrary: (library: Library) => void;
+  /** Drop an in-memory (authored/folder-loaded) library. */
+  removeLibrary: (name: string) => void;
   /** Names of all selectable libraries (scanned + folder-loaded). */
   libraryNames: () => string[];
   setLoadError: (message: string | null) => void;
@@ -237,7 +242,7 @@ function upsertRule(
 }
 
 export const useStore = create<AppState>((set, get) => ({
-  page: 'browse',
+  page: 'manage',
   theme: initialTheme(),
   resolvedTheme: resolveTheme(initialTheme()),
   setTheme: (theme) => {
@@ -273,8 +278,6 @@ export const useStore = create<AppState>((set, get) => ({
   settingsOpen: false,
   setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
   library: null,
-  libraryView: 'manage',
-  setLibraryView: (libraryView) => set({ libraryView }),
   libStatus: {},
   setLibStatus: (name, patch) =>
     set((s) => {
@@ -391,6 +394,19 @@ export const useStore = create<AppState>((set, get) => ({
     }
   },
 
+  searchQueries: [],
+  saveSearchQuery: (q) =>
+    set((s) => {
+      const exists = s.searchQueries.some((x) => x.id === q.id);
+      return {
+        searchQueries: exists
+          ? s.searchQueries.map((x) => (x.id === q.id ? q : x))
+          : [...s.searchQueries, q],
+      };
+    }),
+  removeSearchQuery: (id) =>
+    set((s) => ({ searchQueries: s.searchQueries.filter((x) => x.id !== id) })),
+
   setPage: (page) => set({ page }),
 
   setLibrary: (library) =>
@@ -455,6 +471,24 @@ export const useStore = create<AppState>((set, get) => ({
     }));
     get().setLibrary(library);
   },
+
+  registerLibrary: (library) => {
+    // Keep it in `extras` so it's always offered in the selector + source
+    // lists; setLibrary also caches it and makes it active. Unlike
+    // addExtraLibrary this doesn't touch the Manage "scan directory" label.
+    set((s) => ({ extras: { ...s.extras, [library.name]: library } }));
+    get().setLibrary(library);
+  },
+
+  removeLibrary: (name) =>
+    set((s) => {
+      const extras = { ...s.extras };
+      delete extras[name];
+      const cache = { ...s.cache };
+      delete cache[name];
+      const clearing = s.library?.name === name;
+      return { extras, cache, library: clearing ? null : s.library };
+    }),
 
   libraryNames: () => {
     const { manifest, extras } = get();

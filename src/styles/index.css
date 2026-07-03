@@ -399,6 +399,18 @@ code {
   overflow: hidden;
 }
 
+/* Loading placeholder in the table area (keeps the Browse shell in place). */
+.table-loading {
+  grid-row: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 24px;
+}
+
 /* ---- Filter bar (above the table) ---- */
 .filter-bar {
   padding: 10px 14px;
@@ -1114,35 +1126,62 @@ table.grid tbody tr.selected:hover td {
   font-weight: 400;
 }
 
-/* ---- Sketch / Ketcher ---- */
-.sketch {
+/* ---- Search / Ketcher ---- */
+.search-page {
   display: flex;
   flex-direction: column;
-  padding: 0;
+  min-height: 0;
 }
 
-.sketch-bar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 16px;
-  border-bottom: 1px solid var(--border);
-  background: var(--panel);
+.search-status {
+  max-width: 46ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.sketch-bar h2 {
-  margin: 0;
-  font-size: 15px;
-}
-
-.sketch-bar .spacer {
+.search-build {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
   flex: 1;
+  min-height: 0;
+}
+
+.search-editor {
+  overflow: auto;
+  padding: 14px 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.search-smiles-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.search-smiles-input {
+  flex: 1;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 13px;
+}
+
+.ketcher-host.search-canvas {
+  height: 380px;
+  flex: none;
 }
 
 .ketcher-host {
   position: relative;
-  flex: 1;
-  min-height: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
 }
 
 .ketcher-host > * {
@@ -1150,11 +1189,248 @@ table.grid tbody tr.selected:hover td {
   inset: 0;
 }
 
-.sketch-status {
-  max-width: 40ch;
+.search-optbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  align-items: flex-end;
+  padding: 4px 0;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+
+.search-opt {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.search-opt select,
+.search-opt input[type='number'] {
+  padding: 6px 8px;
+}
+
+.search-opt input[type='number'] {
+  width: 90px;
+}
+
+.search-opt input[type='range'] {
+  width: 170px;
+}
+
+/* ---- Search results ---- */
+.search-results {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.manager-section {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 12px 2px 2px;
+}
+
+.manage-title {
+  font-size: 15px;
+}
+
+.back-btn {
+  padding: 4px 10px;
+}
+
+/* ---- Library author ---- */
+.author {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 16px 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.author-config {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  max-width: 860px;
+}
+
+/* Give the source rows + filter builders room to breathe (wider than the
+   Analyse defaults they borrow styling from). */
+.author-config .cmp-sources {
+  max-width: none;
+}
+
+.author-config .cmp-name,
+.author-smiles {
+  max-width: 520px;
+}
+
+.author-config h4 {
+  margin: 8px 0 2px;
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.author-hint {
+  margin: 0 0 4px;
+}
+
+.author-mode button {
+  padding: 3px 10px;
+}
+
+.author-scope {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 4px 6px 6px 30px;
+}
+
+.author-scope-seg button {
+  padding: 2px 9px;
+  font-size: 12px;
+}
+
+.author-scope select {
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+/* The embedded Browse-style quick filter spans the full scope width. */
+.author-quickfilter {
+  flex-basis: 100%;
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-top: 2px;
+}
+
+.author-smiles {
+  min-height: 90px;
+  resize: vertical;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.author-opt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  margin-top: 4px;
+}
+
+.author-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+}
+
+.author-preview h4 {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.author-summary {
+  font-size: 14px;
+}
+
+.author-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px;
+}
+
+.author-hit {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  background: var(--panel);
+}
+
+.author-hit-id {
+  font-size: 11px;
+  max-width: 100%;
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.search-results-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.search-noresults {
+  padding: 30px 0;
+}
+
+.search-results-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 10px;
+}
+
+.search-hit {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  background: var(--panel);
+}
+
+.search-hit:hover {
+  border-color: var(--accent);
+}
+
+.search-hit-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  justify-content: center;
+  font-size: 11px;
+}
+
+.search-hit-id {
+  color: var(--muted);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.search-hit-score {
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+  font-weight: 600;
 }
 
 /* ---- Dialog ---- */
@@ -1748,11 +2024,27 @@ table.grid tbody tr.selected:hover td {
   font-weight: 600;
 }
 
+/* Config: library panel on the left, analyses panel to its right. */
+.cmp-config-row {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.cmp-config-col {
+  flex: 1 1 360px;
+  min-width: 0;
+}
+
+.cmp-config-col > h4:first-child {
+  margin-top: 0;
+}
+
 .cmp-sources {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  max-width: 560px;
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 8px;
@@ -1855,6 +2147,25 @@ table.grid tbody tr.selected:hover td {
   overflow: auto;
 }
 
+/* Result rendered inline below the config in the combined Analyse editor. */
+.result-below {
+  margin-top: 20px;
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+}
+
+.result-below-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.result-below-head h3 {
+  margin: 0;
+  font-size: 15px;
+}
+
 /* ---- Analyse: property overlays + options ---- */
 .analyse-results > .legend.wrap {
   flex-basis: 100%;
@@ -1912,7 +2223,6 @@ table.grid tbody tr.selected:hover td {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  max-width: 560px;
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 8px;
@@ -2225,6 +2535,42 @@ table.grid tbody tr.selected:hover td {
 .cmp-editor-head .cmp-name {
   flex: 1;
   margin-bottom: 0;
+}
+
+/* Name shown as text until the rename (pencil) icon is clicked. */
+.cmp-title {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cmp-title-text {
+  font-size: 16px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cmp-name-edit {
+  color: var(--muted);
+  padding: 2px 5px;
+  background: transparent;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 5px;
+}
+
+.cmp-name-edit:hover {
+  color: var(--text);
+  background: var(--hover);
+}
+
+.cmp-editor-head .cmp-del {
+  margin-left: auto;
 }
 
 .cmp-estimate {

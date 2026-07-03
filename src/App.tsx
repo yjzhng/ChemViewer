@@ -1,15 +1,14 @@
-import { Suspense, lazy, useEffect } from 'react';
+import { useEffect } from 'react';
 import { useStore } from './data/store';
 import { AppNav } from './components/AppNav';
+import { ManagePage } from './components/ManagePage';
 import { BrowsePage } from './components/BrowsePage';
 import { AnalysePage } from './components/AnalysePage';
+import SearchPage from './components/SearchPage';
 import { MoleculeDialog } from './components/MoleculeDialog';
 import { SettingsDialog } from './components/SettingsDialog';
 import { PrecomputeManager } from './components/PrecomputeManager';
 import { applyAccent } from './theme/accent';
-
-// Ketcher is heavy and pulls in a WASM worker — load it only when needed.
-const SketchPage = lazy(() => import('./components/SketchPage'));
 
 export function App() {
   const page = useStore((s) => s.page);
@@ -61,13 +60,10 @@ export function App() {
         </div>
       )}
 
+      {page === 'manage' && <ManagePage />}
       {page === 'browse' && <BrowsePage />}
       {page === 'analyse' && <AnalysePage />}
-      {page === 'sketch' && (
-        <Suspense fallback={<div className="empty">Loading sketcher…</div>}>
-          <SketchPage />
-        </Suspense>
-      )}
+      {page === 'search' && <SearchPage />}
 
       {selectedCompound && library && (
         <MoleculeDialog

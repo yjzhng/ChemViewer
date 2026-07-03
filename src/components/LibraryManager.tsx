@@ -7,6 +7,7 @@ import {
   supportsDirectoryPicker,
 } from '../data/loaders/directory';
 import type { ManifestEntry } from '../data/loaders/manifest';
+import type { Library } from '../data/types';
 
 function FolderIcon() {
   return (
@@ -47,7 +48,7 @@ function LibraryCard({ entry }: { entry: ManifestEntry }) {
   const status = useStore((s) => s.libStatus[entry.name]);
   const active = useStore((s) => s.library?.name === entry.name);
   const selectLibraryByName = useStore((s) => s.selectLibraryByName);
-  const setLibraryView = useStore((s) => s.setLibraryView);
+  const setPage = useStore((s) => s.setPage);
 
   const ready = status?.state === 'ready';
   const pct = status
@@ -59,7 +60,7 @@ function LibraryCard({ entry }: { entry: ManifestEntry }) {
 
   const open = () => {
     selectLibraryByName(entry.name);
-    setLibraryView('browse');
+    setPage('browse');
   };
 
   return (
@@ -106,14 +107,73 @@ function LibraryCard({ entry }: { entry: ManifestEntry }) {
   );
 }
 
+/** Card for an in-memory (authored or folder-loaded) library — always ready. */
+function ExtraLibraryCard({ library }: { library: Library }) {
+  const active = useStore((s) => s.library?.name === library.name);
+  const selectLibraryByName = useStore((s) => s.selectLibraryByName);
+  const removeLibrary = useStore((s) => s.removeLibrary);
+  const setPage = useStore((s) => s.setPage);
+
+  const open = () => {
+    selectLibraryByName(library.name);
+    setPage('browse');
+  };
+
+  return (
+    <div className={`libcard${active ? ' active' : ''}`}>
+      <div className="libcard-head">
+        <div className="libcard-title">
+          <FolderIcon />
+          <span className="libcard-name">{library.name}</span>
+          <span className="libcard-backend muted">in-memory</span>
+        </div>
+        <div className="libcard-actions">
+          <span className="ready-dot on" />
+          <span className="muted libcard-status">Ready</span>
+          <button
+            className="mini-btn"
+            title="Discard this in-memory library"
+            onClick={() => removeLibrary(library.name)}
+          >
+            Remove
+          </button>
+          <button className="mini-btn" onClick={open}>
+            {active ? 'Current' : 'Open'}
+          </button>
+        </div>
+      </div>
+
+      <div className="libcard-files">
+        <div className="fileline">
+          <span className="filekey muted">Compounds</span>
+          <span className="fileval">
+            {library.compounds.length.toLocaleString()} · {library.columns.length} columns
+          </span>
+        </div>
+      </div>
+
+      <div className="libcard-bar">
+        <div className="libcard-bar-fill" style={{ width: '100%' }} />
+      </div>
+    </div>
+  );
+}
+
 /** Library management: choose a scan directory and view detection + precompute. */
 export function LibraryManager() {
   const manifest = useStore((s) => s.manifest);
+  const extras = useStore((s) => s.extras);
   const directoryLabel = useStore((s) => s.directoryLabel);
   const addExtraLibrary = useStore((s) => s.addExtraLibrary);
   const setLoadError = useStore((s) => s.setLoadError);
   const libraryLoading = useStore((s) => s.libraryLoading);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // In-memory libraries (authored via Create, or folder-loaded) that aren't
+  // part of the on-disk scan.
+  const extraLibs = Object.values(extras).filter(
+    (l) => !manifest.some((m) => m.name === l.name),
+  );
 
   const chooseDirectory = async () => {
     setLoadError(null);
@@ -178,11 +238,17 @@ export function LibraryManager() {
       </div>
 
       <div className="manager-list">
-        {manifest.length === 0 && (
+        {manifest.length === 0 && extraLibs.length === 0 && (
           <div className="muted">No libraries detected in this directory.</div>
         )}
         {manifest.map((entry) => (
           <LibraryCard key={entry.name} entry={entry} />
+        ))}
+        {extraLibs.length > 0 && (
+          <div className="manager-section muted">In-memory libraries</div>
+        )}
+        {extraLibs.map((lib) => (
+          <ExtraLibraryCard key={lib.name} library={lib} />
         ))}
       </div>
     </div>

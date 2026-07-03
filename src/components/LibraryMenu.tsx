@@ -7,7 +7,7 @@ export function LibraryMenu({ library }: { library: Library }) {
   const manifest = useStore((s) => s.manifest);
   const extras = useStore((s) => s.extras);
   const libStatus = useStore((s) => s.libStatus);
-  const setLibraryView = useStore((s) => s.setLibraryView);
+  const setPage = useStore((s) => s.setPage);
   const selectLibraryByName = useStore((s) => s.selectLibraryByName);
   const libraryLoading = useStore((s) => s.libraryLoading);
   const [open, setOpen] = useState(false);
@@ -66,7 +66,7 @@ export function LibraryMenu({ library }: { library: Library }) {
             <button
               className="pop-item muted"
               onClick={() => {
-                setLibraryView('manage');
+                setPage('manage');
                 setOpen(false);
               }}
             >
