@@ -4,6 +4,8 @@
   "private": true,
   "type": "module",
   "description": "Interactive browser of chemical libraries",
+  "author": "yjzhng",
+  "license": "MIT",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",

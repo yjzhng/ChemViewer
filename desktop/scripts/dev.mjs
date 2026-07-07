@@ -13,7 +13,7 @@
 //   2. On macOS, an unpackaged Electron run shows the stock "Electron" identity,
 //      and the default bundle id (com.github.Electron) is shared, so two sibling
 //      apps collide in Launch Services and one can launch the other. We brand a
-//      cheap APFS clone with a UNIQUE bundle id (tech.morrealelab.chemviewer).
+//      cheap APFS clone with a UNIQUE bundle id (tech.yjzhng.chemviewer).
 
 import { spawn, execFileSync } from 'node:child_process'
 import {
@@ -39,7 +39,7 @@ const electronBinDefault = resolve(desktop, 'node_modules/.bin/electron')
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
 // macOS branded Electron clone with a UNIQUE bundle id (see header, defense #2).
-const BRAND_ID = 'tech.morrealelab.chemviewer'
+const BRAND_ID = 'tech.yjzhng.chemviewer'
 const BRAND_REV = '1' // bump to force a re-brand when this logic changes
 function brandedElectronBin() {
   if (process.platform !== 'darwin' || process.env.CHEMVIEWER_NO_BRAND === '1') {

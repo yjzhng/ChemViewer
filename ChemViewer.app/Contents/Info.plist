@@ -7,7 +7,7 @@
   <key>CFBundleIconFile</key>
   <string>icon</string>
   <key>CFBundleIdentifier</key>
-  <string>com.morrealelab.chemviewer.launcher</string>
+  <string>tech.yjzhng.chemviewer.launcher</string>
   <key>CFBundleName</key>
   <string>ChemViewer</string>
   <key>CFBundleDisplayName</key>

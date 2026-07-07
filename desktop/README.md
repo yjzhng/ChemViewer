@@ -30,7 +30,7 @@ To stop one app's session mixing with a sibling Electron app's:
 2. **Branded Electron clone (macOS).** An unpackaged Electron run otherwise uses
    the shared `com.github.Electron` bundle id, so sibling apps collide in Launch
    Services. We make a cheap APFS clone branded with a unique bundle id
-   (`tech.morrealelab.chemviewer`). Disable with `CHEMVIEWER_NO_BRAND=1`.
+   (`tech.yjzhng.chemviewer`). Disable with `CHEMVIEWER_NO_BRAND=1`.
 
 ## Env toggles
 
