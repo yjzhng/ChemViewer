@@ -10,3 +10,4 @@ desktop/node_modules/
 desktop/build/
 .dbcache/
 library/*
+!library/Example-drug-library

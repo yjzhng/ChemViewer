@@ -1,0 +1,11 @@
+Name,SMILES,Class,MolWeight
+Aspirin,CC(=O)Oc1ccccc1C(=O)O,NSAID,180.16
+Caffeine,CN1C=NC2=C1C(=O)N(C)C(=O)N2C,Stimulant,194.19
+Ibuprofen,CC(C)Cc1ccc(cc1)C(C)C(=O)O,NSAID,206.28
+Acetaminophen,CC(=O)Nc1ccc(O)cc1,Analgesic,151.16
+Penicillin G,CC1(C)SC2C(NC(=O)Cc3ccccc3)C(=O)N2C1C(=O)O,Antibiotic,334.39
+Atorvastatin,CC(C)c1c(C(=O)Nc2ccccc2)c(-c2ccccc2)c(-c2ccc(F)cc2)n1CCC(O)CC(O)CC(=O)O,Statin,558.64
+Metformin,CN(C)C(=N)NC(=N)N,Antidiabetic,129.16
+Morphine,CN1CC[C@]23c4c5ccc(O)c4O[C@H]2[C@@H](O)C=C[C@H]3[C@H]1C5,Opioid,285.34
+Diazepam,CN1C(=O)CN=C(c2ccccc2)c2cc(Cl)ccc21,Benzodiazepine,284.74
+Sildenafil,CCCc1nn(C)c2c1nc([nH]c2=O)-c1cc(ccc1OCC)S(=O)(=O)N1CCN(C)CC1,PDE5 inhibitor,474.58
