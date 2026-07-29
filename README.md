@@ -1,42 +1,74 @@
 # ChemViewer
 
-Interactive browser for chemical libraries: explore compound properties,
-view property statistics, and compare libraries.
+Interactive browser for chemical libraries — explore compound properties, view
+property statistics, and compare libraries. Runs as a macOS desktop app or from
+source in the browser.
 
-## Quick start
+Features:
 
-Launch **ChemViewer.app** in the repo. First launch installs
-dependencies (may take a few minutes)
+- Auto-scans a library folder; loads `.csv`, `.sdf`, `.smiles`, `.cxsmiles`
+- Fast virtualized table with live-rendered structures ([RDKit](https://www.rdkit.org))
+- Compound property statistics and library-vs-library comparison
+- Large libraries queried on disk via [DuckDB](https://duckdb.org) — no full load
 
-To load a library, drop libray files in folder named after the library under `library/` 
+## Quick start — install the app (macOS)
 
-Currently supported formats: `.csv`, `.sdf`,
-`.smiles`, or `.cxsmiles`
+1. Download the `.dmg` from the [latest release](https://github.com/yjzhng/ChemViewer/releases/latest) — `arm64` (Apple Silicon).
+2. Open it and drag **ChemViewer** to Applications.
+3. **First launch** may be blocked by system security:
+   - **macOS 15 (Sequoia) or newer:** double-click ChemViewer → a "not opened"
+     alert appears → open **System Settings → Privacy & Security**, scroll down,
+     and click **Open Anyway**.
+   - **macOS 14 or older:** **right-click** ChemViewer → **Open** → **Open** in
+     the dialog.
+4. After that it opens normally.
 
-## Advanced (command line)
+> [!TIP]
+> Terminal alternative to the Gatekeeper prompt, once installed:
+> `xattr -dr com.apple.quarantine /Applications/ChemViewer.app`
+
+### Add your libraries
+
+Drop a folder (named after the library) holding a `.csv`, `.sdf`, `.smiles`, or
+`.cxsmiles` file into `~/Library/Application Support/ChemViewer/library/` — it's
+auto-discovered on next launch. The app ships with an example drug library.
+
+## Run from source (developers)
+
+Needs [Node.js](https://nodejs.org) + git.
+
+- **Native window (macOS):** clone the repo and double-click `ChemViewer.app`
+  (first run installs deps), or `make desktop`. Add libraries in the repo's
+  `library/` folder. See [desktop/README.md](desktop/README.md).
+- **Browser / any OS:** `npm install && npm run dev` → http://localhost:5173
+
+### Build the installer
 
 ```sh
-make install        # or: npm install
-make desktop        # native window around the live Vite server
-npm run dev         # browser-only dev server (http://localhost:5173)
+npm --prefix desktop install     # one-time: Electron + electron-builder
+npm --prefix desktop run dist    # → desktop/release/ChemViewer-<version>-arm64.dmg
 ```
 
-See [desktop/README.md](desktop/README.md) for the port guard and env toggles.
+Ad-hoc signed (no Apple Developer ID), which is why a downloaded copy shows the
+"unidentified developer / Open Anyway" dialog. See
+[desktop/README.md](desktop/README.md) for the packaged-app architecture.
 
 ## Notes
 
-- Small library are loaded in memory(<50 MB).  Large CSV/SMILES files (over 50 MB) are queried on disk via DuckDB
-- Table will be **capped at 300k rows** (with banner notification)
-- SDF is always memory-backed, so only use SDF format for small libraries
-- As the tool is intended to be light-weight, locally run, large libraries are subsampled before any analysis
-- Options to compute full library stats are available
+- Large CSV/SMILES (>50 MB) are queried on disk via DuckDB and load in full;
+  everything else is held in memory and **capped at 300k rows** (a banner shows
+  when truncated) — this can hit a dense sub-50 MB file or any SDF (SDF is always
+  memory-backed).
+- Large libraries are subsampled before analysis (kept light-weight and local);
+  full-library stats are available on demand.
+- Structure depictions are theme-aware and copy as transparent vector/PNG.
 
-## References
+## Built with
 
-- [RDKit](https://www.rdkit.org/) ([@rdkit/rdkit](https://www.npmjs.com/package/@rdkit/rdkit)) — WASM 2D depiction, descriptors, fingerprints, substructure search.
+- [RDKit](https://www.rdkit.org/) — 2D depiction, descriptors, fingerprints, substructure search.
 - [Ketcher](https://github.com/epam/ketcher) — in-app structure sketcher.
 - [OpenChemLib](https://github.com/cheminfo/openchemlib-js) — conformer / PMI descriptors.
 - [DuckDB](https://duckdb.org/) — on-disk querying of large libraries.
 - [TanStack Table](https://tanstack.com/table) / [Virtual](https://tanstack.com/virtual) — virtualized data grid.
 - [umap-js](https://github.com/PAIR-code/umap-js) — dimensionality reduction for embedding plots.
-- [Vite](https://vitejs.dev/) · [React](https://react.dev/) · [Electron](https://www.electronjs.org/) — build tooling and desktop shell.
+- [React](https://react.dev/) · [Vite](https://vitejs.dev/) · [Electron](https://www.electronjs.org/) + [electron-builder](https://www.electron.build) — UI, build, desktop shell & packaging.
