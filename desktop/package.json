@@ -1,6 +1,6 @@
 {
   "name": "chemviewer-desktop",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "ChemViewer desktop shell (Electron) — from-source dev launcher + packaged-app (DMG) builder",
   "author": "yjzhng",

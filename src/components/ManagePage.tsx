@@ -12,26 +12,19 @@ export function ManagePage() {
 
   return (
     <div className="page">
-      <header className="browse-header">
-        {creating ? (
-          <>
+      {creating ? (
+        <>
+          <header className="browse-header">
             <button className="back-btn" onClick={() => setCreating(false)}>
               ← Back
             </button>
             <strong className="manage-title">Create library</strong>
-          </>
-        ) : (
-          <>
-            <strong className="manage-title">Manage libraries</strong>
-            <span className="spacer" />
-            <button className="primary" onClick={() => setCreating(true)}>
-              + Create library
-            </button>
-          </>
-        )}
-      </header>
-
-      {creating ? <LibraryAuthor /> : <LibraryManager />}
+          </header>
+          <LibraryAuthor />
+        </>
+      ) : (
+        <LibraryManager onCreate={() => setCreating(true)} />
+      )}
     </div>
   );
 }

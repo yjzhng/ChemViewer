@@ -3,13 +3,15 @@ import { useStore, type Theme } from '../data/store';
 import { ACCENT_PRESETS } from '../theme/accent';
 import { pcClear } from '../data/precomputeCache';
 import { Switch } from './Switch';
+import { useUpdateCheck, RELEASES_URL } from '../useUpdateCheck';
 
-type Section = 'theme' | 'display' | 'data';
+type Section = 'theme' | 'display' | 'data' | 'about';
 
 const SECTIONS: { id: Section; label: string }[] = [
   { id: 'theme', label: 'Theme' },
   { id: 'display', label: 'Chemical display' },
   { id: 'data', label: 'Data' },
+  { id: 'about', label: 'About' },
 ];
 
 const THEME_OPTIONS: { id: Theme; label: string }[] = [
@@ -243,9 +245,64 @@ function DataSection() {
   );
 }
 
+function AboutSection() {
+  const update = useUpdateCheck();
+  const silenced = useStore((s) => s.updateSilenced);
+  const setSilenced = useStore((s) => s.setUpdateSilenced);
+  return (
+    <>
+      <div className="setting-row">
+        <div className="setting-label">
+          <div>ChemViewer</div>
+          <div className="muted">Version {update.current}</div>
+        </div>
+        {update.updateAvailable ? (
+          <a
+            className="update-link"
+            href={update.releaseUrl}
+            target="_blank"
+            rel="noreferrer"
+          >
+            <span className="update-dot inline" aria-hidden="true" />
+            Update to v{update.latest} →
+          </a>
+        ) : update.latest ? (
+          <span className="muted">On the latest version</span>
+        ) : (
+          <span className="muted">Checking…</span>
+        )}
+      </div>
+
+      {update.updateAvailable && (
+        <div className="setting-row">
+          <div className="setting-label">
+            <div className="muted">
+              Updates install manually: download the new .dmg from the{' '}
+              <a href={RELEASES_URL} target="_blank" rel="noreferrer">
+                releases page
+              </a>{' '}
+              and drag it to Applications. Your libraries and settings are kept.
+            </div>
+          </div>
+        </div>
+      )}
+
+      <Toggle
+        label="Silence update notifications"
+        hint="Hide the dot on the settings gear even when a new version is available."
+        checked={silenced}
+        onChange={setSilenced}
+      />
+    </>
+  );
+}
+
 export function SettingsDialog() {
   const open = useStore((s) => s.settingsOpen);
   const setSettingsOpen = useStore((s) => s.setSettingsOpen);
+  const silenced = useStore((s) => s.updateSilenced);
+  const update = useUpdateCheck();
+  const showUpdateDot = update.updateAvailable && !silenced;
   const [section, setSection] = useState<Section>('theme');
 
   if (!open) return null;
@@ -262,6 +319,9 @@ export function SettingsDialog() {
               onClick={() => setSection(s.id)}
             >
               {s.label}
+              {s.id === 'about' && showUpdateDot && (
+                <span className="update-dot inline" aria-hidden="true" />
+              )}
             </button>
           ))}
         </aside>
@@ -276,6 +336,7 @@ export function SettingsDialog() {
           {section === 'theme' && <ThemeSection />}
           {section === 'display' && <DisplaySection />}
           {section === 'data' && <DataSection />}
+          {section === 'about' && <AboutSection />}
         </section>
       </div>
     </div>

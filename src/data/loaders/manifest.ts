@@ -21,6 +21,10 @@ export interface ManifestEntry {
   sourceFiles?: string[];
   readmeUrl?: string;
   backend: 'memory' | 'duckdb';
+  /** Total size on disk of the source files, in bytes. */
+  size?: number;
+  /** Compound/record count (memory-backed libs only; undefined for DuckDB). */
+  count?: number;
 }
 
 /** Fetch the library manifest; returns [] if the endpoint isn't available. */

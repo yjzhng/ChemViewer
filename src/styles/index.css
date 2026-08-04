@@ -1,19 +1,19 @@
 :root {
   /* Dark (default) — plain neutral palette, no chromatic accent. */
-  --bg: #15171c;
-  --panel: #1c1f26;
-  --panel-2: #242832;
-  --border: #313643;
-  --text: #e7e9ee;
-  --muted: #9aa1ad;
+  --bg: #141414;
+  --panel: #1c1c1c;
+  --panel-2: #242424;
+  --border: #333333;
+  --text: #e8e8e8;
+  --muted: #9e9e9e;
   --accent: #4f9cf9; /* highlight / toggle-on / selection */
   --accent-fg: #08121f; /* text/icon on an accent fill */
   --accent-soft: rgba(79, 156, 249, 0.18); /* selection background tint */
-  --hover: #2b303b;
-  --chart: #8b919b; /* histogram bars */
-  --primary-bg: #e7e9ee;
-  --primary-fg: #15171c;
-  --link: #c3c8d2;
+  --hover: #2c2c2c;
+  --chart: #8f8f8f; /* histogram bars */
+  --primary-bg: #e8e8e8;
+  --primary-fg: #141414;
+  --link: #c8c8c8;
   --danger: #e5675f;
   color-scheme: dark;
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
@@ -29,7 +29,7 @@
   --accent: #2f6fdc;
   --accent-fg: #ffffff;
   --accent-soft: rgba(47, 111, 220, 0.14);
-  --hover: #e7e9ee;
+  --hover: #e8e8e8;
   --chart: #6b7280;
   --primary-bg: #1b1e24;
   --primary-fg: #ffffff;
@@ -186,6 +186,43 @@ code {
 
 .icon-btn:hover {
   color: var(--text);
+}
+
+/* Update-available notification dot + link (see useUpdateCheck) */
+.update-anchor {
+  position: relative;
+}
+
+.update-dot {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #3b82f6;
+  box-shadow: 0 0 0 2px var(--panel);
+}
+
+.update-dot.inline {
+  position: static;
+  display: inline-block;
+  margin-left: 6px;
+  vertical-align: middle;
+  box-shadow: none;
+}
+
+.update-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #3b82f6;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.update-link:hover {
+  text-decoration: underline;
 }
 
 .page-tab {
@@ -1084,7 +1121,11 @@ table.grid tbody tr.selected:hover td {
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 14px 16px;
-  width: 380px;
+  /* Grow to fill available width (wrap at ~360px), but let wide content scroll. */
+  flex: 1 1 360px;
+  min-width: 0;
+  max-width: 640px;
+  overflow-x: auto;
 }
 
 .analyse-card h3 {
@@ -1717,9 +1758,12 @@ table.grid tbody tr.selected:hover td {
 .manager-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
+  gap: 10px;
   margin-bottom: 16px;
+}
+
+.manager-head .spacer {
+  flex: 1;
 }
 
 .manager-dir {
@@ -1728,16 +1772,200 @@ table.grid tbody tr.selected:hover td {
   gap: 10px;
 }
 
+/* Import library button */
+.import-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--accent);
+  color: var(--accent-fg);
+  border-color: transparent;
+  font-weight: 600;
+}
+
+/* Create library button (secondary, sits right of Import) */
+.create-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
+
+/* Manage toggle (active state) */
+.mini-btn.active {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+/* Tile / list view toggle */
+.view-toggle button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 8px;
+  color: var(--muted);
+}
+
+.view-toggle button.active {
+  color: var(--text);
+}
+
+/* Tile column-count control */
+.cols-toggle button {
+  min-width: 26px;
+  padding: 4px 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.import-btn:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+
+.import-btn:disabled {
+  opacity: 0.5;
+}
+
+/* Import dialog */
+.import-dialog {
+  width: 460px;
+  max-width: calc(100vw - 40px);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 20px 18px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.4);
+}
+
+.import-field {
+  margin-top: 14px;
+}
+
+.import-field-label {
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.import-name-input {
+  width: 100%;
+}
+
+.import-choose {
+  font-size: 13px;
+}
+
+.import-files {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-2);
+  max-height: 120px;
+  overflow: auto;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.import-files li {
+  padding: 2px 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.import-mode-hint {
+  font-size: 11px;
+  margin-top: 6px;
+}
+
+.import-mode-hint.warn {
+  color: var(--danger);
+}
+
+.import-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.manager-error {
+  max-width: 720px;
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--danger);
+  color: var(--danger);
+  font-size: 12px;
+}
+
 .manager-count {
   font-size: 12px;
   font-variant-numeric: tabular-nums;
 }
 
 .manager-list {
+  gap: 12px;
+}
+
+/* List view: single column of full-width cards */
+.manager-list.list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  max-width: 720px;
+  max-width: 860px;
+}
+
+/* Tile view: responsive grid of cards */
+.manager-list.tile {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  align-items: start;
+}
+
+/* Draggable wrapper (manage mode) */
+.lib-item {
+  min-width: 0;
+}
+
+.lib-item.manage .libcard {
+  cursor: grab;
+}
+
+/* Placeholder shown at the drop position while dragging */
+.lib-placeholder {
+  min-height: 84px;
+  height: 100%;
+  border: 2px dashed var(--accent);
+  border-radius: 8px;
+  background: var(--accent-soft);
+}
+
+/* Drag handle, inline just left of the library name */
+.drag-handle {
+  display: inline-flex;
+  align-items: center;
+  color: var(--muted);
+  cursor: grab;
+  margin-right: 2px;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+/* Compact tile stats (compounds · file size) */
+.libcard-stats {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 9px 0 10px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.libcard-stats .stat-sep {
+  color: var(--muted);
 }
 
 .libcard {
@@ -1765,11 +1993,29 @@ table.grid tbody tr.selected:hover td {
   min-width: 0;
 }
 
+/* Keep the folder/drag icons at a fixed size (don't let a long name shrink them) */
+.libcard-title > svg,
+.libcard-title .drag-handle {
+  flex: none;
+}
+
 .libcard-name {
   font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  min-width: 0;
+}
+
+/* Format / backend chip (pill) shown in the tile stats row */
+.libcard-chip {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 5px;
+  color: var(--muted);
 }
 
 .libcard-backend {
@@ -1811,6 +2057,15 @@ table.grid tbody tr.selected:hover td {
 .mini-btn {
   padding: 3px 10px;
   font-size: 12px;
+}
+
+.mini-btn.danger {
+  color: var(--danger);
+  border-color: transparent;
+}
+
+.mini-btn.danger:hover:not(:disabled) {
+  border-color: var(--danger);
 }
 
 .libcard-files {
@@ -1945,12 +2200,38 @@ table.grid tbody tr.selected:hover td {
 }
 
 .cmp-list {
-  border-right: 1px solid var(--border);
   overflow: auto;
   padding: 10px;
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+/* Draggable divider between the left panel and the content (Analyse / Search).
+   Thin 1px line by default within a wider hit area; thick + accent on hover. */
+.panel-resizer {
+  position: relative;
+  cursor: col-resize;
+  background: transparent;
+}
+
+.panel-resizer::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 1px;
+  background: var(--border);
+  transition:
+    width 0.1s ease,
+    background 0.1s ease;
+}
+
+.panel-resizer:hover::before {
+  width: 3px;
+  background: var(--accent);
 }
 
 .cmp-new {
@@ -2025,6 +2306,18 @@ table.grid tbody tr.selected:hover td {
 }
 
 /* Config: library panel on the left, analyses panel to its right. */
+.cmp-section {
+  margin-top: 20px;
+}
+
+.cmp-section-title {
+  font-size: 13px;
+  font-weight: 700;
+  margin: 0 0 12px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+
 .cmp-config-row {
   display: flex;
   gap: 24px;
@@ -2149,9 +2442,7 @@ table.grid tbody tr.selected:hover td {
 
 /* Result rendered inline below the config in the combined Analyse editor. */
 .result-below {
-  margin-top: 20px;
-  border-top: 1px solid var(--border);
-  padding-top: 16px;
+  margin-top: 0;
 }
 
 .result-below-head {
@@ -2636,34 +2927,34 @@ table.grid tbody tr.selected:hover td {
    variables at higher specificity + !important so it beats their defaults and
    any portalled (out-of-.ketcher-host) UI. ---- */
 :root[data-theme='dark'] {
-  --color-background-primary: #1c1f26 !important;
-  --color-background-secondary: #242832 !important;
+  --color-background-primary: #1c1c1c !important;
+  --color-background-secondary: #242424 !important;
   --color-background-overlay: rgba(0, 0, 0, 0.55) !important;
-  --color-border-primary: #313643 !important;
-  --color-border-secondary: #313643 !important;
-  --color-divider: #313643 !important;
-  --color-text-primary: #e7e9ee !important;
-  --color-text-dark: #e7e9ee !important;
-  --color-text-secondary: #9aa1ad !important;
-  --color-text-light: #9aa1ad !important;
-  --color-text-lightgrey: #9aa1ad !important;
-  --color-icon-grey: #9aa1ad !important;
-  --color-icon-hover: #e7e9ee !important;
+  --color-border-primary: #333333 !important;
+  --color-border-secondary: #333333 !important;
+  --color-divider: #333333 !important;
+  --color-text-primary: #e8e8e8 !important;
+  --color-text-dark: #e8e8e8 !important;
+  --color-text-secondary: #9e9e9e !important;
+  --color-text-light: #9e9e9e !important;
+  --color-text-lightgrey: #9e9e9e !important;
+  --color-icon-grey: #9e9e9e !important;
+  --color-icon-hover: #e8e8e8 !important;
   --color-icon-active: #4f9cf9 !important;
   --color-icon-clicked: #4f9cf9 !important;
   --color-icon-disabled: #4a4f5a !important;
-  --color-button-group-hover: #2b303b !important;
-  --color-button-group-active: #313643 !important;
-  --color-button-secondary-hover: #2b303b !important;
-  --color-button-secondary-active: #2b303b !important;
-  --color-button-secondary-clicked: #313643 !important;
-  --color-button-transparent-active: #2b303b !important;
-  --color-dropdown-primary: #1c1f26 !important;
-  --color-dropdown-secondary: #242832 !important;
-  --color-dropdown-hover: #2b303b !important;
-  --color-input-background-primary: #15171c !important;
-  --color-input-background-default: #15171c !important;
-  --color-input-background-hover: #1c1f26 !important;
+  --color-button-group-hover: #2c2c2c !important;
+  --color-button-group-active: #333333 !important;
+  --color-button-secondary-hover: #2c2c2c !important;
+  --color-button-secondary-active: #2c2c2c !important;
+  --color-button-secondary-clicked: #333333 !important;
+  --color-button-transparent-active: #2c2c2c !important;
+  --color-dropdown-primary: #1c1c1c !important;
+  --color-dropdown-secondary: #242424 !important;
+  --color-dropdown-hover: #2c2c2c !important;
+  --color-input-background-primary: #141414 !important;
+  --color-input-background-default: #141414 !important;
+  --color-input-background-hover: #1c1c1c !important;
   /* keep the canvas light so black-drawn structures stay visible */
   --color-background-canvas: #eceef2 !important;
 }

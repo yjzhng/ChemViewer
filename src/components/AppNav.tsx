@@ -1,4 +1,5 @@
 import { useStore, type AppPage } from '../data/store';
+import { useUpdateCheck } from '../useUpdateCheck';
 
 const PAGES: { id: AppPage; label: string }[] = [
   { id: 'manage', label: 'Manage' },
@@ -30,6 +31,9 @@ export function AppNav() {
   const page = useStore((s) => s.page);
   const setPage = useStore((s) => s.setPage);
   const setSettingsOpen = useStore((s) => s.setSettingsOpen);
+  const silenced = useStore((s) => s.updateSilenced);
+  const update = useUpdateCheck();
+  const showUpdateDot = update.updateAvailable && !silenced;
 
   return (
     <nav className="appnav">
@@ -50,11 +54,17 @@ export function AppNav() {
       <span className="spacer" />
 
       <button
-        className="icon-btn"
-        title="Settings"
+        className="icon-btn update-anchor"
+        title={
+          showUpdateDot ? `Settings — v${update.latest} available` : 'Settings'
+        }
+        aria-label={
+          showUpdateDot ? 'Settings (update available)' : 'Settings'
+        }
         onClick={() => setSettingsOpen(true)}
       >
         <GearIcon />
+        {showUpdateDot && <span className="update-dot" aria-hidden="true" />}
       </button>
     </nav>
   );

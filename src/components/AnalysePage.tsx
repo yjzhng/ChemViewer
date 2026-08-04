@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useStore } from '../data/store';
+import { useResizablePanel } from '../useResizablePanel';
 import {
   loadResult,
   persistResult,
@@ -1021,8 +1022,15 @@ function CreateView() {
   const fmtEst = (s: number): string =>
     s < 1 ? '<1 s' : s < 90 ? `~${Math.round(s)} s` : `~${Math.round(s / 60)} min`;
 
+  const { width: leftW, onMouseDown: onResize } = useResizablePanel(
+    'chemviewer-analyse-left',
+  );
+
   return (
-    <div className="analyse-create">
+    <div
+      className="analyse-create"
+      style={{ gridTemplateColumns: `${leftW}px 5px minmax(0, 1fr)` }}
+    >
       <aside className="cmp-list">
         <button
           className="cmp-new"
@@ -1050,6 +1058,12 @@ function CreateView() {
           </div>
         ))}
       </aside>
+
+      <div
+        className="panel-resizer"
+        onMouseDown={onResize}
+        title="Drag to resize"
+      />
 
       <section className="cmp-editor">
         {!editing ? (
@@ -1080,6 +1094,31 @@ function CreateView() {
                   </button>
                 </div>
               )}
+              {dirty && !running && (
+                <span className="cmp-estimate muted small">
+                  est. {fmtEst(estimateSeconds())}
+                </span>
+              )}
+              {!dirty && storedStatus === 'ready' && !running && (
+                <span className="muted small">Saved ✓</span>
+              )}
+              {storedStatus === 'error' && !running && (
+                <span className="error-inline small">
+                  {editing.error ?? 'Compute failed'}
+                </span>
+              )}
+              <button
+                className="primary"
+                onClick={doSubmit}
+                title={
+                  !dirty && storedStatus === 'ready'
+                    ? 'Already computed — change a setting to re-run'
+                    : undefined
+                }
+                disabled={running || editing.sources.length === 0 || !dirty}
+              >
+                {running ? 'Comparing…' : dirty ? 'Compare' : 'Compared'}
+              </button>
               <button
                 className="cmp-del"
                 title="Delete comparison"
@@ -1093,7 +1132,18 @@ function CreateView() {
               </button>
             </div>
 
-            <div className="cmp-config-row">
+            {running && (
+              <div className="cmp-progress">
+                <div
+                  className="cmp-progress-fill"
+                  style={{ width: `${Math.round((progress[editing.id] ?? 0) * 100)}%` }}
+                />
+              </div>
+            )}
+
+            <section className="cmp-section">
+              <h3 className="cmp-section-title">Settings</h3>
+              <div className="cmp-config-row">
               <div className="cmp-config-col">
             <h4>Libraries &amp; subsets</h4>
             <div className="cmp-sources">
@@ -1237,49 +1287,21 @@ function CreateView() {
               })}
             </div>
               </div>
-            </div>
-
-            <div className="cmp-actions">
-              <button
-                className="primary"
-                onClick={doSubmit}
-                title={
-                  !dirty && storedStatus === 'ready'
-                    ? 'Already computed — change a setting to re-run'
-                    : undefined
-                }
-                disabled={running || editing.sources.length === 0 || !dirty}
-              >
-                {running ? 'Running…' : dirty ? 'Submit' : 'Submitted'}
-              </button>
-              {dirty && !running && (
-                <span className="cmp-estimate muted small">
-                  est. run time {fmtEst(estimateSeconds())}
-                </span>
-              )}
-              <span className="spacer" />
-              {!dirty && storedStatus === 'ready' && !running && (
-                <span className="muted small">Result saved ✓</span>
-              )}
-              {storedStatus === 'error' && !running && (
-                <span className="error-inline small">
-                  {editing.error ?? 'Compute failed'}
-                </span>
-              )}
-            </div>
-
-            {running && (
-              <div className="cmp-progress">
-                <div
-                  className="cmp-progress-fill"
-                  style={{ width: `${Math.round((progress[editing.id] ?? 0) * 100)}%` }}
-                />
               </div>
-            )}
+            </section>
 
-            {storedStatus === 'ready' && !running && (
-              <ResultSection comparison={editing} dirty={dirty} />
-            )}
+            <section className="cmp-section">
+              <h3 className="cmp-section-title">Results</h3>
+              {storedStatus === 'ready' && !running ? (
+                <ResultSection comparison={editing} dirty={dirty} />
+              ) : (
+                <div className="muted cmp-hint">
+                  {running
+                    ? 'Comparing…'
+                    : 'Choose settings and press Compare to generate results.'}
+                </div>
+              )}
+            </section>
           </>
         )}
       </section>
@@ -1338,10 +1360,11 @@ function ResultSection({ comparison, dirty }: { comparison: Comparison; dirty: b
 
   return (
     <div className="result-below">
-      <div className="result-below-head">
-        <h3>Results</h3>
-        {dirty && <span className="muted small">config changed — re-run to update</span>}
-      </div>
+      {dirty && (
+        <div className="result-below-head">
+          <span className="muted small">config changed — re-run to update</span>
+        </div>
+      )}
       {loading ? (
         <div className="muted">Loading result…</div>
       ) : result ? (

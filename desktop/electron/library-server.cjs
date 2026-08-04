@@ -37,6 +37,29 @@ function fileUrl(dir, file) {
   return `/library-fs/${encodeURIComponent(dir)}/${encodeURIComponent(file)}`
 }
 
+// Cheap record count for memory-backed libraries (skip huge/DuckDB ones).
+function countRecords(absPaths, format) {
+  try {
+    let n = 0
+    for (const fp of absPaths) {
+      const text = readFileSync(fp, 'utf8')
+      if (format === 'sdf') {
+        const m = text.match(/\$\$\$\$/g)
+        n += m ? m.length : 0
+      } else if (format === 'smiles') {
+        n += text.split('\n').filter((l) => l.trim() !== '').length
+      } else {
+        let lines = text.split('\n').filter((l) => l.trim() !== '')
+        if (lines[0] && /^sep=/i.test(lines[0].trim())) lines = lines.slice(1)
+        n += Math.max(0, lines.length - 1) // minus the header row
+      }
+    }
+    return n
+  } catch {
+    return undefined
+  }
+}
+
 function scanLibraries(libraryRoot) {
   if (!existsSync(libraryRoot)) return []
   const out = []
@@ -66,6 +89,8 @@ function scanLibraries(libraryRoot) {
       0,
     )
     const readme = files.find((f) => /readme/i.test(f))
+    const backend =
+      chosen.format !== 'sdf' && size > LARGE_BYTES ? 'duckdb' : 'memory'
     out.push({
       name: dirent.name,
       format: chosen.format,
@@ -73,8 +98,15 @@ function scanLibraries(libraryRoot) {
       files: [...files].sort(),
       sourceFiles: chosenFiles,
       readmeUrl: readme ? fileUrl(dirent.name, readme) : undefined,
-      backend:
-        chosen.format !== 'sdf' && size > LARGE_BYTES ? 'duckdb' : 'memory',
+      backend,
+      size,
+      count:
+        backend === 'memory' && size <= LARGE_BYTES
+          ? countRecords(
+              chosenFiles.map((f) => resolve(libraryRoot, dirent.name, f)),
+              chosen.format,
+            )
+          : undefined,
     })
   }
   out.sort((a, b) => a.name.localeCompare(b.name))

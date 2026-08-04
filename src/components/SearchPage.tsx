@@ -1,6 +1,7 @@
 import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import type { Ketcher } from 'ketcher-core';
 import { useStore } from '../data/store';
+import { useResizablePanel } from '../useResizablePanel';
 import {
   blankQuery,
   type SearchMatch,
@@ -238,6 +239,10 @@ export default function SearchPage() {
 
   const valid = !!editing && editing.smiles.trim().length > 0;
 
+  const { width: leftW, onMouseDown: onResize } = useResizablePanel(
+    'chemviewer-search-left',
+  );
+
   return (
     <div className="page search-page">
       <header className="browse-header">
@@ -246,7 +251,10 @@ export default function SearchPage() {
         {status && <span className="muted search-status">{status}</span>}
       </header>
 
-      <div className="search-build">
+      <div
+        className="search-build"
+        style={{ gridTemplateColumns: `${leftW}px 5px minmax(0, 1fr)` }}
+      >
         <aside className="cmp-list">
           <button className="cmp-new" onClick={newQuery}>
             + New query
@@ -266,6 +274,12 @@ export default function SearchPage() {
             </div>
           ))}
         </aside>
+
+        <div
+          className="panel-resizer"
+          onMouseDown={onResize}
+          title="Drag to resize"
+        />
 
         <section className="search-editor">
           {!editing ? (

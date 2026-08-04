@@ -7,7 +7,7 @@
 //     renderer AND reimplements the dev data layer — the library scan, raw file
 //     streaming, and DuckDB query endpoints — then load that local URL.
 
-const { app, BrowserWindow, dialog, nativeImage } = require('electron')
+const { app, BrowserWindow, dialog, nativeImage, ipcMain } = require('electron')
 const path = require('node:path')
 const fs = require('node:fs')
 
@@ -43,8 +43,11 @@ function createMainWindow(url) {
     minWidth: 960,
     minHeight: 600,
     title: 'ChemViewer',
-    backgroundColor: '#15171c',
-    webPreferences: { contextIsolation: true },
+    backgroundColor: '#141414',
+    webPreferences: {
+      contextIsolation: true,
+      preload: path.join(__dirname, 'preload.cjs'),
+    },
   })
   mainWindow.loadURL(url)
   mainWindow.on('closed', () => {
@@ -78,8 +81,17 @@ async function waitForUrl(url, { tries = 80, delayMs = 250 } = {}) {
 // The user's writable library folder. Unlike dev (repo root library/), a packaged
 // app's own resources are read-only, so libraries live under userData where the
 // user can add their own folders. Seeded once with the bundled example library.
+// The library root the app reads from. Packaged: a writable userData folder
+// (the bundle is read-only). Dev: the repo's library/ (same folder the Vite
+// library-server plugin scans). Both are where "Import library" writes.
+function libraryRootPath() {
+  return isPackaged
+    ? path.join(app.getPath('userData'), 'library')
+    : path.join(__dirname, '..', '..', 'library')
+}
+
 function ensureLibraryDir() {
-  const libraryRoot = path.join(app.getPath('userData'), 'library')
+  const libraryRoot = libraryRootPath()
   fs.mkdirSync(libraryRoot, { recursive: true })
   const seedRoot = path.join(__dirname, '..', 'library-seed')
   if (!fs.existsSync(seedRoot)) return libraryRoot
@@ -131,6 +143,88 @@ async function bootDev() {
     mainWindow.webContents.openDevTools({ mode: 'detach' })
   }
 }
+
+// ---- Import library (native pick → copy/move into the library root) ----------
+
+// Step 1: native file dialog. Returns absolute paths + basenames (no writes yet).
+ipcMain.handle('pick-library-files', async () => {
+  const win = BrowserWindow.getFocusedWindow() || mainWindow
+  const picked = await dialog.showOpenDialog(win, {
+    title: 'Select library files',
+    buttonLabel: 'Select',
+    properties: ['openFile', 'multiSelections'],
+    filters: [
+      {
+        name: 'Chemical libraries',
+        extensions: ['csv', 'sdf', 'sd', 'smiles', 'smi', 'cxsmiles'],
+      },
+      { name: 'All files', extensions: ['*'] },
+    ],
+  })
+  if (picked.canceled || picked.filePaths.length === 0) return { canceled: true }
+  return {
+    paths: picked.filePaths,
+    names: picked.filePaths.map((p) => path.basename(p)),
+  }
+})
+
+// Step 2: copy/move the picked files into library/<name>/.
+ipcMain.handle('import-library-files', async (_event, opts) => {
+  const { name, mode, paths } = opts || {}
+  if (!Array.isArray(paths) || paths.length === 0) return { error: 'No files selected' }
+  // Sanitize the user-supplied folder name (no separators / traversal).
+  const safe = String(name || '')
+    .replace(/[/\\]/g, '')
+    .replace(/\.\.+/g, '')
+    .trim()
+  if (!safe) return { error: 'Please enter a library name' }
+  try {
+    const root = libraryRootPath()
+    fs.mkdirSync(root, { recursive: true })
+    const dest = path.join(root, safe)
+    if (fs.existsSync(dest)) {
+      return { error: `A library named “${safe}” already exists` }
+    }
+    fs.mkdirSync(dest, { recursive: true })
+    for (const src of paths) {
+      const target = path.join(dest, path.basename(src))
+      if (mode === 'move') {
+        try {
+          fs.renameSync(src, target) // fast path (same filesystem)
+        } catch {
+          fs.copyFileSync(src, target) // cross-device fallback
+          fs.unlinkSync(src)
+        }
+      } else {
+        fs.copyFileSync(src, target)
+      }
+    }
+    return { name: safe, count: paths.length }
+  } catch (err) {
+    return { error: String((err && err.message) || err) }
+  }
+})
+
+// Permanently delete a library folder (a direct child of the library root).
+ipcMain.handle('delete-library', async (_event, name) => {
+  const safe = String(name || '')
+    .replace(/[/\\]/g, '')
+    .replace(/\.\.+/g, '')
+    .trim()
+  if (!safe) return { error: 'Invalid library name' }
+  try {
+    const root = libraryRootPath()
+    const dest = path.join(root, safe)
+    // Guard: only ever delete a direct child of the library root.
+    if (path.dirname(dest) !== root || !fs.existsSync(dest)) {
+      return { error: 'Library not found' }
+    }
+    fs.rmSync(dest, { recursive: true, force: true })
+    return { ok: true }
+  } catch (err) {
+    return { error: String((err && err.message) || err) }
+  }
+})
 
 async function boot() {
   setDockIcon()

@@ -66,6 +66,15 @@ const THEME_KEY = 'chemviewer-theme';
 const ACCENT_KEY = 'chemviewer-accent';
 const DRAW_KEY = 'chemviewer-draw';
 const SCALE_KEY = 'chemviewer-structscale';
+const SILENCE_KEY = 'chemviewer-update-silenced';
+
+function initialSilenced(): boolean {
+  try {
+    return localStorage.getItem(SILENCE_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
 
 function initialAccent(): string | null {
   try {
@@ -131,6 +140,9 @@ interface AppState {
   /** Settings dialog visibility. */
   settingsOpen: boolean;
   setSettingsOpen: (open: boolean) => void;
+  /** Hide the "update available" notification dot even when a newer release exists. */
+  updateSilenced: boolean;
+  setUpdateSilenced: (silenced: boolean) => void;
   library: Library | null;
   /** Per-library precompute status (keyed by name) — drives manager + gating. */
   libStatus: Record<string, LibStatus>;
@@ -277,6 +289,17 @@ export const useStore = create<AppState>((set, get) => ({
     }),
   settingsOpen: false,
   setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
+
+  updateSilenced: initialSilenced(),
+  setUpdateSilenced: (updateSilenced) => {
+    try {
+      if (updateSilenced) localStorage.setItem(SILENCE_KEY, '1');
+      else localStorage.removeItem(SILENCE_KEY);
+    } catch {
+      /* ignore */
+    }
+    set({ updateSilenced });
+  },
   library: null,
   libStatus: {},
   setLibStatus: (name, patch) =>

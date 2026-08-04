@@ -7,6 +7,7 @@ import {
   existsSync,
   mkdirSync,
   readdirSync,
+  readFileSync,
   statSync,
 } from 'node:fs';
 import type { IncomingMessage } from 'node:http';
@@ -16,6 +17,12 @@ import type { ServerResponse } from 'node:http';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const libraryRoot = resolve(here, 'library');
+
+// App version — what the GitHub release/DMG is tagged as (electron-builder reads
+// desktop/package.json). Injected as __APP_VERSION__ for the in-app update check.
+const appVersion = JSON.parse(
+  readFileSync(resolve(here, 'desktop/package.json'), 'utf8'),
+).version as string;
 
 /**
  * RDKit ships a UMD glue script + a .wasm blob. Vite can't bundle the glue, so
@@ -57,6 +64,10 @@ interface ManifestEntry {
   readmeUrl?: string;
   /** 'duckdb' for large files (queried on disk), 'memory' for small (streamed). */
   backend: 'memory' | 'duckdb';
+  /** Total size on disk of the source files, in bytes. */
+  size?: number;
+  /** Compound/record count (memory-backed libs only; undefined for DuckDB). */
+  count?: number;
 }
 
 // Files larger than this are queried via DuckDB instead of loaded in-memory.
@@ -76,6 +87,32 @@ const FORMAT_PRIORITY: ManifestEntry['format'][] = ['csv', 'sdf', 'smiles'];
 
 function fileUrl(dir: string, file: string): string {
   return `/library-fs/${encodeURIComponent(dir)}/${encodeURIComponent(file)}`;
+}
+
+/** Cheap record count for memory-backed libraries (skip huge/DuckDB ones). */
+function countRecords(
+  absPaths: string[],
+  format: ManifestEntry['format'],
+): number | undefined {
+  try {
+    let n = 0;
+    for (const fp of absPaths) {
+      const text = readFileSync(fp, 'utf8');
+      if (format === 'sdf') {
+        const m = text.match(/\$\$\$\$/g);
+        n += m ? m.length : 0;
+      } else if (format === 'smiles') {
+        n += text.split('\n').filter((l) => l.trim() !== '').length;
+      } else {
+        let lines = text.split('\n').filter((l) => l.trim() !== '');
+        if (lines[0] && /^sep=/i.test(lines[0].trim())) lines = lines.slice(1);
+        n += Math.max(0, lines.length - 1); // minus the header row
+      }
+    }
+    return n;
+  } catch {
+    return undefined;
+  }
 }
 
 /** Scan library/ for subfolders containing a loadable source file. */
@@ -112,6 +149,10 @@ function scanLibraries(): ManifestEntry[] {
       0,
     );
     const readme = files.find((f) => /readme/i.test(f));
+    // SDF can't be queried by DuckDB's read_csv (it needs RDKit), so it's
+    // always memory-backed; only large CSV/SMILES use DuckDB.
+    const backend =
+      chosen.format !== 'sdf' && size > LARGE_BYTES ? 'duckdb' : 'memory';
     out.push({
       name: dirent.name,
       format: chosen.format,
@@ -119,10 +160,16 @@ function scanLibraries(): ManifestEntry[] {
       files: [...files].sort(),
       sourceFiles: chosenFiles,
       readmeUrl: readme ? fileUrl(dirent.name, readme) : undefined,
-      // SDF can't be queried by DuckDB's read_csv (it needs RDKit), so it's
-      // always memory-backed; only large CSV/SMILES use DuckDB.
-      backend:
-        chosen.format !== 'sdf' && size > LARGE_BYTES ? 'duckdb' : 'memory',
+      backend,
+      size,
+      // Count only smallish memory-backed libs (avoid reading a huge file at scan).
+      count:
+        backend === 'memory' && size <= LARGE_BYTES
+          ? countRecords(
+              chosenFiles.map((f) => resolve(libraryRoot, dirent.name, f)),
+              chosen.format,
+            )
+          : undefined,
     });
   }
   // Deterministic order so startup auto-load is predictable.
@@ -269,6 +316,7 @@ export default defineConfig({
     nodePolyfills({ globals: { global: true, process: true, Buffer: true } }),
   ],
   server: { port: 5173 },
+  define: { __APP_VERSION__: JSON.stringify(appVersion) },
   // The compute worker dynamically imports OpenChemLib, which needs code
   // splitting — only the ES worker format supports that.
   worker: { format: 'es' },
